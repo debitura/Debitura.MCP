@@ -13,6 +13,12 @@ const WRITE_ANNOTATIONS = {
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Allowed file extensions for upload_case_file.
+ * Source: CasesController.cs:1982
+ */
+const ALLOWED_EXTENSIONS = new Set([".pdf", ".xls", ".xlsx", ".csv", ".txt", ".jpg", ".jpeg", ".png", ".gif"]);
+
 export function registerWriteTools(
   server: McpServer,
   api: CustomerApiClient,
@@ -44,9 +50,9 @@ export function registerWriteTools(
               .string()
               .optional()
               .describe("Company registration number (VAT/CVR/org number)"),
-            address: z.string().optional().describe("Street address"),
+            address: z.string().describe("Street address — required by the API"),
             zipCode: z.string().optional().describe("Postal/ZIP code"),
-            city: z.string().optional().describe("City"),
+            city: z.string().describe("City — required by the API"),
             countryAlpha2: z.string().length(2).describe("Country (ISO 3166-1 alpha-2)"),
             stateAlpha2: z
               .string()
@@ -56,7 +62,9 @@ export function registerWriteTools(
             phone: z.string().optional().describe("Debtor phone incl. country code"),
           })
           .describe("The debtor the claim is against"),
-        date: z.string().optional().describe("Invoice date (ISO 8601)"),
+        date: z
+          .string()
+          .describe("Invoice date (ISO 8601, e.g. 2026-03-01) — required by the API"),
         dueDate: z
           .string()
           .describe(
@@ -80,7 +88,7 @@ export function registerWriteTools(
         assignedUserEmail: z
           .string()
           .optional()
-          .describe("Email of the team member to own the case (see list_team_members)"),
+          .describe("Email of the team member to own the case (use list_team_members to find valid team members)"),
         allowPendingContracts: z
           .boolean()
           .optional()
@@ -96,6 +104,19 @@ export function registerWriteTools(
       annotations: { title: "Create Collection Case", ...WRITE_ANNOTATIONS, idempotentHint: false },
     },
     async (input) => {
+      // Pre-validate US state requirement
+      if (input.debtor.countryAlpha2.toUpperCase() === "US" && !input.debtor.stateAlpha2) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: 'debtor.stateAlpha2 is required for US debtors. Provide the two-letter state code, e.g. "CA" for California.',
+            },
+          ],
+        };
+      }
+
       // One key per confirmed create; reused across transient-failure retries so
       // the API can replay the stored response instead of double-creating (DEB-4574).
       const idempotencyKey = randomUUID();
@@ -137,7 +158,7 @@ export function registerWriteTools(
         content: [
           {
             type: "text",
-            text: `Network failure submitting the case after 3 attempts (idempotency key ${idempotencyKey}): ${String(lastError)}. The same key was used for all attempts, so no duplicate case was created. Check list_cases before retrying.`,
+            text: `Network failure submitting the case after 3 attempts (idempotency key ${idempotencyKey}): ${String(lastError)}. The same key was used for all attempts, so no duplicate case was created. Use list_cases to check whether the case was created before retrying.`,
           },
         ],
       };
@@ -150,7 +171,7 @@ export function registerWriteTools(
       title: "Upload Case File",
       description:
         "Attach a document to a case (invoice copy, contract, correspondence, proof of delivery). " +
-        "Max 25 MB. Allowed types include PDF, images, and common office documents. " +
+        "Max 25 MB. Allowed extensions: .pdf, .xls, .xlsx, .csv, .txt, .jpg, .jpeg, .png, .gif. " +
         "Provide the file content base64-encoded.",
       inputSchema: {
         caseId: z.string().uuid().describe("Debitura case ID (GUID)"),
@@ -161,11 +182,39 @@ export function registerWriteTools(
           .optional()
           .describe('MIME type, e.g. "application/pdf" (inferred from extension if omitted)'),
         description: z.string().optional().describe("Short description of the document"),
-        documentType: z.string().optional().describe('Document category, e.g. "Invoice"'),
+        documentType: z
+          .enum([
+            "OriginalInvoice",
+            "DebtorDocuments",
+            "CreditorDocuments",
+            "PartnerDocuments",
+            "DemandLetter",
+            "Miscellaneous",
+          ])
+          .optional()
+          .describe(
+            "Document category (default: OriginalInvoice). " +
+            "Values: OriginalInvoice · DebtorDocuments · CreditorDocuments · PartnerDocuments · DemandLetter · Miscellaneous",
+          ),
       },
       annotations: { title: "Upload Case File", ...WRITE_ANNOTATIONS, idempotentHint: false },
     },
     async ({ caseId, fileName, contentBase64, contentType, description, documentType }) => {
+      // Pre-validate file extension
+      const ext = "." + (fileName.toLowerCase().split(".").pop() ?? "");
+      if (!ALLOWED_EXTENSIONS.has(ext)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                `File extension "${ext}" is not allowed. Supported extensions: ${[...ALLOWED_EXTENSIONS].join(", ")}.`,
+            },
+          ],
+        };
+      }
+
       let bytes: Buffer;
       try {
         bytes = Buffer.from(contentBase64, "base64");
@@ -233,7 +282,7 @@ export function registerWriteTools(
           content: [
             {
               type: "text",
-              text: "A sender is required: provide senderUserId or senderEmail. Call list_team_members to find valid team members, and ask the user who the message should be sent as.",
+              text: "A sender is required: provide senderUserId or senderEmail. Use the list_team_members tool to find valid team members, and ask the user who the message should be sent as.",
             },
           ],
         };
