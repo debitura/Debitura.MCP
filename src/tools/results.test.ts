@@ -46,6 +46,18 @@ describe("stripRestSentences", () => {
     const msg = "Something went wrong. Please try again.";
     assert.equal(stripRestSentences(msg), msg);
   });
+
+  it("treats ? and ! as sentence boundaries — preserves surrounding sentences", () => {
+    // "Why?" must survive even though it shares no period boundary with the REST sentence
+    const msg = "Why? Use GET /users to retry. OK!";
+    assert.equal(stripRestSentences(msg), "Why? OK!");
+  });
+
+  it("adds a trailing period when the original lacked one but a sentence was stripped", () => {
+    // "Bad email." keeps its period; "Use GET /users" had none but the first sentence does
+    const msg = "Bad email. Use GET /users";
+    assert.equal(stripRestSentences(msg), "Bad email.");
+  });
 });
 
 // ---------------------------------------------------------------------------

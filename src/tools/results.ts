@@ -35,18 +35,18 @@ const REST_VERB_PATH = /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/\S+/;
  * caller falls back to the original message rather than emitting silence.
  */
 export function stripRestSentences(message: string): string | null {
-  const trailingPeriod = /\.\s*$/.test(message);
-  // Split on period+whitespace — sentence boundaries in prose.
+  // Split AFTER sentence-ending punctuation (. ? !) followed by whitespace.
+  // Each segment retains its own terminal punctuation so rejoin is clean.
   // Dots inside tokens (emails, decimals) are not followed by whitespace, so they survive.
-  const parts = message.split(/\.\s+/);
-  // Normalise the last segment: remove any trailing period so we can re-add it uniformly.
-  if (parts.length > 0) {
-    parts[parts.length - 1] = parts[parts.length - 1].replace(/\.\s*$/, "");
-  }
+  const parts = message.split(/(?<=[.?!])\s+/);
   const kept = parts.filter(p => !REST_VERB_PATH.test(p));
   if (kept.length === 0) return null;
-  const joined = kept.join(". ");
-  return trailingPeriod ? `${joined}.` : joined;
+  const joined = kept.join(" ");
+  // If the original ended with terminal punctuation but the joined result does not
+  // (e.g. the only surviving segment lacked its own closing mark), add a period.
+  const originalEndsWithPunct = /[.?!]\s*$/.test(message);
+  const joinedEndsWithPunct = /[.?!]$/.test(joined);
+  return originalEndsWithPunct && !joinedEndsWithPunct ? `${joined}.` : joined;
 }
 
 /**
