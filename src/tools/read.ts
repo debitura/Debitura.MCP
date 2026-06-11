@@ -129,20 +129,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         page: z.number().int().min(1).optional().describe("Page number, starting from 1 (default 1)"),
         pageSize: z.number().int().min(1).max(100).optional().describe("Results per page (default 10, max 100)"),
         statuses: z
-          .array(
-            z.enum([
-              "PendingContractSigning",
-              "PendingVerificationInternal",
-              "PendingVerification",
-              "NeedsAdditionalDetails",
-              "Leads",
-              "LeadsQuoteGiven",
-              "Active",
-              "Paused",
-              "Closed",
-              "Merged",
-            ]),
-          )
+          .array(z.enum(LIFECYCLE_VALUES as unknown as [string, ...string[]]))
           .optional()
           .describe(
             "Filter by lifecycle status. Values: PendingContractSigning, PendingVerificationInternal, " +
@@ -160,27 +147,32 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       annotations: { title: "List Cases", ...READ_ANNOTATIONS },
     },
     async ({ page, pageSize, statuses, sort }) => {
-      // Validate sort field before calling the API (unknown fields are silently ignored)
+      // Validate sort field before calling the API (unknown fields are silently ignored).
+      // Match case-insensitively and normalise to canonical PascalCase.
+      let canonicalSort: string | undefined;
       if (sort) {
-        const field = sort.split(":")[0];
-        if (!SORTABLE_FIELDS.has(field)) {
+        const [rawField, direction] = sort.split(":");
+        const lowerField = rawField.toLowerCase();
+        const canonicalField = [...SORTABLE_FIELDS].find((f) => f.toLowerCase() === lowerField);
+        if (!canonicalField) {
           return {
             isError: true,
             content: [
               {
                 type: "text",
                 text:
-                  `Unknown sort field "${field}". Valid fields are: ${[...SORTABLE_FIELDS].join(", ")}. ` +
+                  `Unknown sort field "${rawField}". Valid fields are: ${[...SORTABLE_FIELDS].join(", ")}. ` +
                   `Format: Field:asc or Field:desc, e.g. GrossAmount:desc`,
               },
             ],
           };
         }
+        canonicalSort = direction ? `${canonicalField}:${direction}` : canonicalField;
       }
 
       const { data, error, response } = await api.GET("/cases", {
         params: {
-          query: { Page: page, PageSize: pageSize, Statuses: statuses, Sort: sort },
+          query: { Page: page, PageSize: pageSize, Statuses: statuses, Sort: canonicalSort },
         },
       });
       if (!data) return apiErrorResult(response.status, error);
@@ -474,16 +466,33 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       // One call per lifecycle — reads totalResults from page metadata only (pageSize=1)
       const results = await Promise.all(
         LIFECYCLE_VALUES.map(async (lifecycle) => {
-          const { data } = await api.GET("/cases", {
+          const { data, error, response } = await api.GET("/cases", {
             params: { query: { Statuses: [lifecycle], PageSize: 1, Page: 1 } },
           });
-          return { lifecycle, count: data?.page?.totalResults ?? 0 };
+          if (!data) {
+            return { lifecycle, count: null as number | null, error: `HTTP ${response.status}: ${JSON.stringify(error)}` };
+          }
+          return { lifecycle, count: data.page?.totalResults ?? 0, error: null };
         }),
       );
 
+      const failed = results.filter((r) => r.error !== null);
+      if (failed.length > 0) {
+        const details = failed.map((r) => `  ${r.lifecycle}: ${r.error}`).join("\n");
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to fetch counts for ${failed.length} lifecycle(s):\n${details}`,
+            },
+          ],
+        };
+      }
+
       const summary: Record<string, number> = {};
       for (const { lifecycle, count } of results) {
-        summary[lifecycle] = count;
+        summary[lifecycle] = count as number;
       }
       return jsonResult(summary);
     },
