@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
+    "test": "tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "generate:types": "openapi-typescript openapi/customer-api.json -o src/generated/customer-api.d.ts",
     "fetch:spec": "curl -sf https://customer-api.debitura.com/swagger/v1/swagger.json -o openapi/customer-api.json && npm run generate:types"
