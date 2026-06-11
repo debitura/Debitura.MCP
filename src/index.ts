@@ -48,6 +48,9 @@ app.post("/mcp", async (req: Request, res: Response) => {
   const server = buildServer(apiKey);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
+    // Plain JSON responses instead of SSE: this server is stateless and sits
+    // behind the Cloudflare proxy, where buffered JSON is the robust choice.
+    enableJsonResponse: true,
   });
   res.on("close", () => {
     void transport.close();
