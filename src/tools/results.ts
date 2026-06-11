@@ -24,13 +24,30 @@ const MCP_RECOVERY_HINTS: Record<string, string> = {
   InvalidUserEmail: "Use the `list_team_members` tool to retrieve valid team member emails.",
 };
 
+/** Matches an uppercase REST verb followed by a path. No `i` flag — avoids false-positives on natural language ("get /tmp", "put /path"). */
+const REST_VERB_PATH = /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/\S+/;
+
 /**
- * Matches a sentence (or sentence fragment) containing a REST verb + path reference,
- * e.g. "Use GET /users to retrieve valid user emails." or "See POST /cases for details."
- * The sentence boundary is a period, end-of-string, or the start of the next sentence
- * (capital letter following whitespace).
+ * Strip sentences containing REST verb+path references from `message`.
+ *
+ * Splits on ". " boundaries so dots inside email addresses and decimal numbers
+ * are preserved intact. Returns null if all sentences would be stripped — the
+ * caller falls back to the original message rather than emitting silence.
  */
-const REST_SENTENCE_PATTERN = /[^.]*\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/\S+[^.]*\.?\s*/gi;
+export function stripRestSentences(message: string): string | null {
+  const trailingPeriod = /\.\s*$/.test(message);
+  // Split on period+whitespace — sentence boundaries in prose.
+  // Dots inside tokens (emails, decimals) are not followed by whitespace, so they survive.
+  const parts = message.split(/\.\s+/);
+  // Normalise the last segment: remove any trailing period so we can re-add it uniformly.
+  if (parts.length > 0) {
+    parts[parts.length - 1] = parts[parts.length - 1].replace(/\.\s*$/, "");
+  }
+  const kept = parts.filter(p => !REST_VERB_PATH.test(p));
+  if (kept.length === 0) return null;
+  const joined = kept.join(". ");
+  return trailingPeriod ? `${joined}.` : joined;
+}
 
 /**
  * Translate a Customer API error body for MCP consumption.
@@ -40,9 +57,10 @@ const REST_SENTENCE_PATTERN = /[^.]*\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/\S+[^.]*
  * an MCP-appropriate recovery hint (e.g. "Use the `list_team_members` tool…").
  *
  * For unknown error codes the REST-endpoint sentences are still stripped so no raw
- * REST path leaks through to an MCP agent that cannot act on it.
+ * REST path leaks through to an MCP agent that cannot act on it. If stripping would
+ * produce an empty message the original is preserved — failing toward more information.
  */
-function translateErrorBody(body: unknown): unknown {
+export function translateErrorBody(body: unknown): unknown {
   if (body === null || body === undefined || typeof body !== "object" || Array.isArray(body)) {
     return body;
   }
@@ -56,32 +74,27 @@ function translateErrorBody(body: unknown): unknown {
   }
 
   const mcpHint = MCP_RECOVERY_HINTS[errorCode];
-
-  // Strip sentences that contain REST verb+path references.
-  // Reset the regex lastIndex before each use (global flag retains state across calls).
-  REST_SENTENCE_PATTERN.lastIndex = 0;
-  const hasRestRef = REST_SENTENCE_PATTERN.test(originalMessage);
-  REST_SENTENCE_PATTERN.lastIndex = 0;
+  const hasRestRef = REST_VERB_PATH.test(originalMessage);
 
   if (!hasRestRef && !mcpHint) {
-    // Nothing to rewrite — return the original body unchanged
     return body;
   }
 
-  // Build the translated message:
-  // • If there are REST references, strip them and reconstruct around the MCP hint.
-  // • If there's only a hint (API message changed but error code is stable), append it.
   let translatedMessage: string;
   if (hasRestRef) {
-    // Remove REST-referencing sentences, clean up trailing whitespace/period
-    const afterStrip = originalMessage.replace(REST_SENTENCE_PATTERN, "").trim().replace(/\.\s*$/, "").trim();
-    const base = afterStrip ? (afterStrip.endsWith(".") ? afterStrip : `${afterStrip}.`) : "";
-    const parts = [base, mcpHint].filter(Boolean);
-    translatedMessage = parts.join(" ");
+    const stripped = stripRestSentences(originalMessage);
+    if (stripped === null) {
+      // All sentences referenced REST endpoints — avoid emitting an empty message.
+      // Fall back to the MCP hint alone (if known) or the original text.
+      translatedMessage = mcpHint ?? originalMessage;
+    } else {
+      const base = stripped.endsWith(".") ? stripped : `${stripped}.`;
+      translatedMessage = mcpHint ? `${base} ${mcpHint}` : stripped;
+    }
   } else {
-    // No REST ref to strip — just append the hint
+    // No REST ref to strip — append the hint to the existing message
     const base = originalMessage.endsWith(".") ? originalMessage : `${originalMessage}.`;
-    translatedMessage = mcpHint ? `${base} ${mcpHint}` : originalMessage;
+    translatedMessage = `${base} ${mcpHint}`;
   }
 
   return { ...errorObj, message: translatedMessage };
