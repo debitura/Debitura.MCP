@@ -1,0 +1,43 @@
+{
+  "name": "@debitura/mcp-server",
+  "version": "0.1.0",
+  "description": "Debitura MCP server — cross-border debt collection over the Debitura Customer API",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "generate:types": "openapi-typescript openapi/customer-api.json -o src/generated/customer-api.d.ts",
+    "fetch:spec": "curl -sf https://customer-api.debitura.com/swagger/v1/swagger.json -o openapi/customer-api.json && npm run generate:types"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Admino-SaaS/Debitura.MCP.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "debt-collection",
+    "debitura",
+    "cross-border"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^5.2.1",
+    "openapi-fetch": "^0.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
