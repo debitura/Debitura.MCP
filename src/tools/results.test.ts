@@ -1,6 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { stripRestSentences, translateErrorBody } from "./results.js";
+import {
+  stripRestSentences,
+  translateErrorBody,
+  isBusinessErrorResponse,
+  renderBusinessErrors,
+  apiErrorResult,
+} from "./results.js";
+
+/** Extract the single text block from a CallToolResult for assertions. */
+function resultText(result: { content: { type: string; text?: string }[] }): string {
+  return result.content.map((c) => c.text ?? "").join("");
+}
 
 // ---------------------------------------------------------------------------
 // stripRestSentences
@@ -122,5 +133,116 @@ describe("translateErrorBody", () => {
     const result = translateErrorBody(body) as Record<string, string>;
     assert.match(result.message, /list_team_members/);
     assert.match(result.message, /bad@example\.com/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isBusinessErrorResponse
+// ---------------------------------------------------------------------------
+
+describe("isBusinessErrorResponse", () => {
+  it("detects a non-empty businessErrors array", () => {
+    assert.equal(isBusinessErrorResponse({ businessErrors: [{ type: "X" }] }), true);
+  });
+
+  it("rejects empty / missing / non-array businessErrors and non-objects", () => {
+    assert.equal(isBusinessErrorResponse({ businessErrors: [] }), false);
+    assert.equal(isBusinessErrorResponse({ message: "legacy" }), false);
+    assert.equal(isBusinessErrorResponse({ businessErrors: "oops" }), false);
+    assert.equal(isBusinessErrorResponse(null), false);
+    assert.equal(isBusinessErrorResponse("string"), false);
+    assert.equal(isBusinessErrorResponse([{ type: "X" }]), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderBusinessErrors
+// ---------------------------------------------------------------------------
+
+describe("renderBusinessErrors", () => {
+  it("renders message, stable code, and a mapped recovery hint as next step", () => {
+    const out = renderBusinessErrors({
+      businessErrors: [{ type: "DuplicateCreditorReference", message: "Already exists." }],
+    });
+    assert.match(out, /Already exists\./);
+    assert.match(out, /\[DuplicateCreditorReference\]/);
+    assert.match(out, /Next step:/);
+    assert.match(out, /get_case/);
+  });
+
+  it("surfaces the combined signing URL prominently at the top", () => {
+    const out = renderBusinessErrors({
+      businessErrors: [{ type: "MissingDebtCollectionContract", message: "Sign first." }],
+      signingHandoff: { combinedSigningUrl: "https://app.debitura.com/sign/abc" },
+    });
+    const firstLine = out.split("\n")[0];
+    assert.match(firstLine, /ACTION REQUIRED/);
+    assert.match(out, /https:\/\/app\.debitura\.com\/sign\/abc/);
+  });
+
+  it("includes per-error solutionUrl in the next step", () => {
+    const out = renderBusinessErrors({
+      businessErrors: [
+        { type: "MissingPowerOfAttorney", message: "PoA missing.", solutionUrl: "https://x/poa" },
+      ],
+    });
+    assert.match(out, /https:\/\/x\/poa/);
+  });
+
+  it("renders unknown codes with message + code and no fabricated hint", () => {
+    const out = renderBusinessErrors({
+      businessErrors: [{ type: "SomethingNew", message: "Unexpected." }],
+    });
+    assert.match(out, /Unexpected\. \[SomethingNew\]/);
+    assert.doesNotMatch(out, /Next step:/);
+  });
+
+  it("maps UnsupportedCountry/Currency to a preview_case eligibility hint", () => {
+    const out = renderBusinessErrors({
+      businessErrors: [{ type: "UnsupportedCountry", message: "Country not supported." }],
+    });
+    assert.match(out, /preview_case/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// apiErrorResult — structured vs legacy paths
+// ---------------------------------------------------------------------------
+
+describe("apiErrorResult", () => {
+  it("renders a structured 422 business-error body", () => {
+    const result = apiErrorResult(422, {
+      businessErrors: [{ type: "DuplicateCreditorReference", message: "Dup." }],
+    });
+    assert.equal(result.isError, true);
+    const text = resultText(result);
+    assert.match(text, /HTTP 422/);
+    assert.match(text, /business rule violation/);
+    assert.match(text, /\[DuplicateCreditorReference\]/);
+  });
+
+  it("appends extraGuidance below the rendered business errors", () => {
+    const result = apiErrorResult(
+      422,
+      { businessErrors: [{ type: "DuplicateCreditorReference", message: "Dup." }] },
+      "Call get_case with creditorReference \"INV-1\".",
+    );
+    const text = resultText(result);
+    assert.match(text, /INV-1/);
+  });
+
+  it("renders legacy/unstructured bodies exactly as before (no businessErrors)", () => {
+    const result = apiErrorResult(401, { error: "Unauthorized", message: "Bad key." });
+    const text = resultText(result);
+    assert.match(text, /Debitura API error \(HTTP 401\)/);
+    assert.match(text, /API key was rejected/);
+    assert.doesNotMatch(text, /business rule violation/);
+  });
+
+  it("keeps the legacy 422 hint when the body has no businessErrors", () => {
+    const result = apiErrorResult(422, { message: "Some legacy validation text." });
+    const text = resultText(result);
+    assert.match(text, /business validation error/);
+    assert.match(text, /Some legacy validation text\./);
   });
 });

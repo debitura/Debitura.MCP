@@ -124,7 +124,8 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         "`NeedsAdditionalDetails` · `Leads` · `LeadsQuoteGiven` · `Active` · `Paused` · `Closed` · `Merged`\n\n" +
         "Sortable fields: `DateCreated` · `DateUpdated` · `DateFinished` · `DateCollectionStarted` · " +
         "`DueDate` · `Date` · `GrossAmount` · `Remainder` · `InterestFees` · `CollectionFees`\n" +
-        "Sort format: `Field:asc` or `Field:desc`, e.g. `GrossAmount:desc`",
+        "Sort format: `Field:asc` or `Field:desc`, e.g. `GrossAmount:desc`\n\n" +
+        "Note: results include the creditor's own test cases; the `isTestCase` flag on each case marks them.",
       inputSchema: {
         page: z.number().int().min(1).optional().describe("Page number, starting from 1 (default 1)"),
         pageSize: z.number().int().min(1).max(100).optional().describe("Results per page (default 10, max 100)"),
@@ -458,7 +459,8 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         "Return a count of cases per lifecycle stage for the creditor's account. " +
         "Useful for a quick portfolio overview without listing all cases. " +
         "Stages: PendingContractSigning, PendingVerificationInternal, PendingVerification, " +
-        "NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged.",
+        "NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged. " +
+        "Note: these counts include the creditor's own test cases; list_cases exposes the `isTestCase` flag that marks them.",
       inputSchema: {},
       annotations: { title: "Get Account Summary", ...READ_ANNOTATIONS },
     },
