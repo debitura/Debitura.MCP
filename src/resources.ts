@@ -142,7 +142,7 @@ export function registerResources(server: McpServer): void {
     {
       title: "Chat Role Glossary",
       description:
-        "Who is who in a case conversation: the Creditor / Partner / System roles returned by get_case_messages, with their role integers.",
+        "Who is who in a case conversation: the Partner / Creditor / Managed-by-partner roles returned by get_case_messages, with their role integers.",
       mimeType: "text/markdown",
     },
     async (uri) => ({
