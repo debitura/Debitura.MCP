@@ -1,7 +1,8 @@
 {
   "name": "@debitura/mcp-server",
   "version": "0.1.0",
-  "description": "Debitura MCP server — cross-border debt collection over the Debitura Customer API",
+  "private": true,
+  "description": "Debitura MCP server — cross-border debt collection over the Debitura Customer API. Hosted at https://mcp.debitura.com/mcp; not published to npm.",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -14,6 +15,9 @@
     "dev": "tsx src/index.ts",
     "test": "tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "generate:types": "openapi-typescript openapi/customer-api.json -o src/generated/customer-api.d.ts",
     "fetch:spec": "curl -sf https://customer-api.debitura.com/swagger/v1/swagger.json -o openapi/customer-api.json && npm run generate:types"
   },
@@ -35,10 +39,14 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.18.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "eslint": "^9.18.0",
     "openapi-typescript": "^7.13.0",
+    "prettier": "^3.4.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.20.0"
   }
 }

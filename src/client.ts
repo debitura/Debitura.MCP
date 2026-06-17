@@ -1,6 +1,6 @@
 import createClient, { type Client } from "openapi-fetch";
 import type { paths } from "./generated/customer-api.js";
-import { API_BASE_URL } from "./config.js";
+import { API_BASE_URL, SERVER_VERSION } from "./config.js";
 
 export type CustomerApiClient = Client<paths>;
 
@@ -13,7 +13,7 @@ export function createApiClient(apiKey: string): CustomerApiClient {
     baseUrl: API_BASE_URL,
     headers: {
       XApiKey: apiKey,
-      "User-Agent": "debitura-mcp/0.1.0",
+      "User-Agent": `debitura-mcp/${SERVER_VERSION}`,
     },
   });
 }

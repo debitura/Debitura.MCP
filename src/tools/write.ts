@@ -15,7 +15,7 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 /**
  * Allowed file extensions for upload_case_file.
- * Source: CasesController.cs:1982
+ * Mirrors the allow-list enforced by the Debitura Customer API's file-upload endpoint.
  */
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".xls", ".xlsx", ".csv", ".txt", ".jpg", ".jpeg", ".png", ".gif"]);
 
@@ -351,22 +351,21 @@ function createCaseGuidance(
   return tips.length > 0 ? { guidance: tips.join("\n"), handledCodes } : undefined;
 }
 
+// Only the extensions in ALLOWED_EXTENSIONS can reach this function — uploads with any
+// other extension are rejected before guessMimeType is called, so the map is kept in sync
+// with the allow-list (no unreachable entries).
 function guessMimeType(fileName: string): string {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   const map: Record<string, string> = {
     pdf: "application/pdf",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    txt: "text/plain",
-    csv: "text/csv",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     xls: "application/vnd.ms-excel",
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    msg: "application/vnd.ms-outlook",
-    eml: "message/rfc822",
+    csv: "text/csv",
+    txt: "text/plain",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
   };
   return map[ext] ?? "application/octet-stream";
 }

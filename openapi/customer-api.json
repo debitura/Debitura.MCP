@@ -17,6 +17,17 @@
         ],
         "summary": "Create collection case",
         "description": "Creates a new collection case for debt collection.\n\n**Test Mode:**\n- Set isTest=true to create a test case (case IS created in the database but marked as test data)\n- Test cases are excluded from production metrics and can be easily filtered or deleted\n- Use test mode for integration testing and development\n\n**Debtor Rules:**\n- debtor.type must be \"Company\" or \"Private\"\n  - Company → debtor.name is mandatory (company name)\n  - Private → debtor.name is mandatory (person's full name)\n\n**Geographic Rules:**\n- debtor.countryAlpha2 (ISO 3166-1 alpha-2) is always required\n- debtor.state is a free-text region description\n- For US debtors: debtor.stateAlpha2 (two-letter state code) is also required – debtor.state is ignored in that scenario\n\n**Optional Parameters:**\n- creditorDivisionId - Assign case to a specific division (for multi-division creditors)\n- collectionPartnerId - Override automatic partner assignment with a specific collection partner\n- skipDebituraVerification - Skip internal verification steps (advanced use)\n- skipCreationEmails - Deprecated: accepted for backwards compatibility but ignored server-side. Creation emails are always suppressed in favour of the hourly CasesStarted digest\n- allowPendingContracts - Accept cases with unsigned contracts in 'PendingContractSigning' status instead of returning 422\n\n**Error Responses:**\n- 400: Field validation errors (returns JSON object with field names as keys and error arrays as values)\n- 422: Business rule violations (returns BusinessErrorResponseApiDTO with type, message, and solutionUrl)\n- 500: Server errors",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: \"IdempotencyConflict\"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key.",
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -63,7 +74,24 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
             "description": "Business rule violation",
@@ -86,7 +114,24 @@
             }
           },
           "500": {
-            "description": "Server error"
+            "description": "Server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -95,7 +140,7 @@
           "Cases"
         ],
         "summary": "List collection cases",
-        "description": "Returns a paginated list of collection cases for your account.\n\n**Pagination:**\n- page (default: 1) - Page number, starting from 1\n- pageSize (default: 10, max: 100) - Number of results per page\n\n**Filters:**\n- statuses - Filter by case lifecycle status (comma-separated list)\n  Valid values: PendingContractSigning, PendingVerificationInternal, PendingVerification,\n  NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed\n- divisionIds - Filter by creditor division IDs (comma-separated GUIDs, for multi-division creditors)\n- debtorIds - Filter by specific debtor IDs (comma-separated GUIDs)\n- ids - Filter by specific case IDs (comma-separated GUIDs)\n\n**Sorting:**\n- sort - Sort field and direction (format: 'field:direction')\n  Examples: 'date:desc', 'amount:asc', 'debtorName:asc'\n\n**Response:**\n- Returns InvoiceListApiDTO with page metadata and cases array\n- Page metadata includes: totalResults, currentPage, skipped, pageSize",
+        "description": "Returns a paginated list of collection cases for your account.\n\n**Pagination:**\n- page (default: 1) - Page number, starting from 1\n- pageSize (default: 10, max: 100) - Number of results per page\n\n**Filters:**\n- statuses - Filter by case lifecycle status (comma-separated list)\n  Valid values: PendingContractSigning, PendingVerificationInternal, PendingVerification,\n  NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged\n  (case-insensitive; both name and description forms accepted)\n- divisionIds - Filter by creditor division IDs (comma-separated GUIDs, for multi-division creditors)\n- debtorIds - Filter by specific debtor IDs (comma-separated GUIDs)\n- ids - Filter by specific case IDs (comma-separated GUIDs)\n\n**Sorting:**\n- sort - Sort field and direction (format: 'field:direction')\n  Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,\n  DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,\n  Lifecycle, CloseCode\n  Examples: 'DateCreated:desc', 'DueDate:asc', 'GrossAmount:desc'\n  Unknown fields are silently ignored.\n\n**Response:**\n- Returns InvoiceListApiDTO with page metadata and cases array\n- Page metadata includes: totalResults, currentPage, skipped, pageSize",
         "parameters": [
           {
             "name": "Page",
@@ -138,7 +183,7 @@
           {
             "name": "Statuses",
             "in": "query",
-            "description": "Filter by case status. Available values depend on the API:\n- Customer API: Open, OnHold, PaymentPlan, Closed, Withdrawn, Completed, PendingContractSigning, PendingVerificationInternal, Unknown\n- Collection Partner API: PendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed\n  (Partner API excludes PendingContractSigning/PendingVerificationInternal as those cases haven't been assigned to partners yet)",
+            "description": "Filter by case lifecycle status. Valid values: PendingContractSigning, PendingVerificationInternal,\nPendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged\n(case-insensitive; both name and description forms accepted).",
             "schema": {
               "type": "array",
               "items": {
@@ -161,7 +206,7 @@
           {
             "name": "Sort",
             "in": "query",
-            "description": "Optional sorting string \"Field[:asc|desc][,Field2[:asc|desc]]…\"",
+            "description": "Optional sorting string \"Field[:asc|desc][,Field2[:asc|desc]]…\".\nValid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,\nDueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,\nLifecycle, CloseCode. Examples: 'DateCreated:desc', 'DueDate:asc'. Unknown fields are silently ignored.",
             "schema": {
               "type": "string"
             }
@@ -189,7 +234,24 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -247,7 +309,44 @@
             }
           },
           "400": {
-            "description": "Invalid request (validation errors)"
+            "description": "Invalid request (validation errors)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -292,10 +391,44 @@
             }
           },
           "400": {
-            "description": "ID missing, empty, or ID is not a collection case"
+            "description": "ID missing, empty, or ID is not a collection case",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found, deleted, or does not belong to your account"
+            "description": "Case not found, deleted, or does not belong to your account",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -339,10 +472,44 @@
             }
           },
           "400": {
-            "description": "Creditor reference missing or empty"
+            "description": "Creditor reference missing or empty",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "No case found with this creditor reference"
+            "description": "No case found with this creditor reference",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -387,10 +554,44 @@
             }
           },
           "400": {
-            "description": "ID missing, empty, or not a collection case"
+            "description": "ID missing, empty, or not a collection case",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found, deleted, or does not belong to your account"
+            "description": "Case not found, deleted, or does not belong to your account",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -434,10 +635,44 @@
             }
           },
           "400": {
-            "description": "Reference missing or reference is not a collection case"
+            "description": "Reference missing or reference is not a collection case",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Reference not found or case does not belong to your account"
+            "description": "Reference not found or case does not belong to your account",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -448,7 +683,7 @@
           "Cases"
         ],
         "summary": "Fetch case timeline",
-        "description": "Returns the full event timeline for the case.",
+        "description": "Returns the full event timeline for the case along with the current engagement phase.\n\n**Response shape:**\n- `items` — chronological list of timeline events\n- `currentEngagementPhase` — current phase of the active engagement: \"Pre-legal\", \"Legal\", or \"Enforcement\". Null when no active engagement exists.",
         "parameters": [
           {
             "name": "id",
@@ -466,35 +701,60 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"
-                  }
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"
-                  }
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"
-                  }
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "ID missing"
+            "description": "ID missing",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -548,10 +808,44 @@
             }
           },
           "400": {
-            "description": "ID missing"
+            "description": "ID missing",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -622,17 +916,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               }
             }
@@ -642,23 +936,40 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
                 }
               }
             }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -712,10 +1023,44 @@
             }
           },
           "400": {
-            "description": "ID missing"
+            "description": "ID missing",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -795,19 +1140,104 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "413": {
-            "description": "File too large"
+            "description": "File too large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "415": {
-            "description": "Unsupported file type"
+            "description": "Unsupported file type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Server error"
+            "description": "Server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -859,13 +1289,64 @@
             }
           },
           "400": {
-            "description": "Invalid case ID"
+            "description": "Invalid case ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Server error"
+            "description": "Server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -910,10 +1391,44 @@
             }
           },
           "400": {
-            "description": "Invalid case ID"
+            "description": "Invalid case ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found"
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -967,10 +1482,44 @@
             }
           },
           "400": {
-            "description": "Invalid ID"
+            "description": "Invalid ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Quote request or case not found"
+            "description": "Quote request or case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1024,10 +1573,44 @@
             }
           },
           "400": {
-            "description": "Invalid ID"
+            "description": "Invalid ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Quote request or case not found"
+            "description": "Quote request or case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1090,10 +1673,64 @@
             }
           },
           "400": {
-            "description": "Invalid ID"
+            "description": "Invalid ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Quote, quote request, or case not found"
+            "description": "Quote, quote request, or case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1137,8 +1774,45 @@
               }
             }
           },
+          "400": {
+            "description": "ID missing or empty",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "Case not found, does not belong to your account, or no collection period exists"
+            "description": "Case not found, does not belong to your account, or no collection period exists",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1183,10 +1857,44 @@
             }
           },
           "400": {
-            "description": "ID missing, empty, or not a collection case"
+            "description": "ID missing, empty, or not a collection case",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Case not found or does not belong to your account"
+            "description": "Case not found or does not belong to your account",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1302,9 +2010,107 @@
             }
           },
           "404": {
-            "description": "Jurisdiction not found"
+            "description": "Jurisdiction not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
+      }
+    },
+    "/coverage/search": {
+      "get": {
+        "tags": [
+          "Coverage"
+        ],
+        "summary": "[DEPRECATED] Search for jurisdiction coverage",
+        "description": "⚠️ **DEPRECATED:** Use POST /coverage/check-eligibility instead.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coverage item returned",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Search query missing or invalid",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No jurisdiction found matching the search query",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
       }
     },
     "/coverage/:search": {
@@ -1345,10 +2151,44 @@
             }
           },
           "400": {
-            "description": "Search query missing or invalid"
+            "description": "Search query missing or invalid",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "No jurisdiction found matching the search query"
+            "description": "No jurisdiction found matching the search query",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "deprecated": true
@@ -1407,7 +2247,24 @@
             }
           },
           "400": {
-            "description": "Invalid request (validation errors)"
+            "description": "Invalid request (validation errors)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1419,6 +2276,17 @@
         ],
         "summary": "Create a new division.",
         "description": "Creates a new division for the authenticated creditor.\n\nDivisions allow creditors to organize cases under different business units, branches, or departments.\n\n**Required Fields:**\n- companyName - Name of the division\n- city - City where the division is located\n- countryCode - ISO 3166-1 alpha-2 country code (e.g. 'US', 'DE', 'DK')\n\n**Optional Fields:**\n- registrationNumber - Company registration number (CVR, VAT, etc.)\n- address, zipCode, state - Full address details\n- officeEmail, officePhone - Contact information",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: \"IdempotencyConflict\"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key.",
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -1465,7 +2333,44 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business rule violation",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -1567,7 +2472,24 @@
             }
           },
           "404": {
-            "description": "Division not found"
+            "description": "Division not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -1634,10 +2556,44 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Division not found"
+            "description": "Division not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -1663,10 +2619,126 @@
             "description": "Division deleted successfully"
           },
           "404": {
-            "description": "Division not found"
+            "description": "Division not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
-            "description": "Division cannot be deleted because it has active cases"
+            "description": "Division cannot be deleted because it has active cases",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/divisions/{id}/archive": {
+      "post": {
+        "tags": [
+          "Divisions"
+        ],
+        "summary": "Archive a division.",
+        "description": "Archives a division, making it inactive. Archived divisions are excluded from list results by default.\n\n**Important:** This action is irreversible. Archived divisions can still be referenced by existing cases.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Division archived successfully",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Division not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Division is already archived",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1711,10 +2783,44 @@
             }
           },
           "404": {
-            "description": "Division not found"
+            "description": "Division not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
-            "description": "Division is already archived"
+            "description": "Division is already archived",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1805,7 +2911,24 @@
             }
           },
           "400": {
-            "description": "Invalid pagination parameters"
+            "description": "Invalid pagination parameters",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1850,10 +2973,44 @@
             }
           },
           "400": {
-            "description": "ID missing or empty"
+            "description": "ID missing or empty",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Payment not found"
+            "description": "Payment not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2002,7 +3159,7 @@
           "TestWebhooks"
         ],
         "summary": "Fire a named webhook event type for a test case.",
-        "description": "Fires a real current-state webhook event for any registered Customer API event type against a test case — even if the case hasn't naturally reached the state that would produce that event.\n\n**Purpose:**\nUnblocks testing webhook handlers for rare or hard-to-reach event types (e.g. `case.closed`, `chat.created`) without having to drive the case through its full lifecycle.\n\n**Payload:**\nThe event carries the real current state of the case — fields are read from the case as it exists now. No payload fabrication or override is supported in this version.\n\n**Event types:**\n- `case.created` — current lifecycle (use after case creation, or to re-test your handler)\n- `case.updated` — current lifecycle (oldLifecycle and newLifecycle both reflect current state)\n- `case.closed` — current close code and comment (use after case is already closed, or to test your handler regardless)\n- `payment.created` — most recent payment on the case (returns 422 if no payments exist)\n- `chat.created` — most recent chat message on the case (returns 422 if no chats exist)\n\n**Target subscriptions:**\n- If `subscriptionId` is provided, fires only to that subscription. Returns 400 if the subscription is not found, not a test subscription, or not owned by this creditor.\n- If omitted, fires to all active test subscriptions registered for the given event type.\n\n**Event log:**\nThe synthetic fire is enqueued into the normal delivery pipeline and recorded in the webhook event log (GET /webhooks/events) exactly like a real dispatch.\n\n**Guards:**\n- Returns 400 if the case is not a test case (`classification != test`), the event type is not valid, or the subscription is not found/not owned.\n- Returns 404 if the case is not found or not owned by this creditor.\n- Returns 422 if required data is missing (e.g. no payments for `payment.created`, no chats for `chat.created`).",
+        "description": "Fires a real current-state webhook event for any registered Customer API event type against a test case — even if the case hasn't naturally reached the state that would produce that event.\n\n**Purpose:**\nUnblocks testing webhook handlers for rare or hard-to-reach event types (e.g. `case.closed`, `chat.created`) without having to drive the case through its full lifecycle.\n\n**Payload:**\nThe event carries the real current state of the case — fields are read from the case as it exists now. No payload fabrication or override is supported in this version.\n\n**Event types:**\n- `case.created` — current lifecycle (use after case creation, or to re-test your handler)\n- `case.updated` — current lifecycle (oldLifecycle and newLifecycle both reflect current state)\n- `case.closed` — current close code and comment (use after case is already closed, or to test your handler regardless)\n- `payment.created` — most recent payment on the case (returns 422 if no payments exist)\n- `chat.created` — most recent chat message on the case (returns 422 if no chats exist)\n\n**Target subscriptions:**\n- If `subscriptionId` is provided, fires only to that subscription. Returns 400 if the subscription is not found, not a test subscription, or not owned by this creditor.\n- If omitted, fires to all active test subscriptions registered for the given event type.\n\n**Event log (asynchronous):**\nThe synthetic fire is enqueued into the normal delivery pipeline, exactly like a real dispatch. A successful response (and its `enqueuedCount`) confirms the event was queued — it does **not** mean a row already exists in the webhook event log. The `WebhookEvent` row appears in `GET /webhooks/events` only after the worker drains the queue and attempts delivery — usually within a few seconds, but allow up to ~30 seconds, as the queue drain can lag under load. Do not assume the row is present the instant this call returns: poll `GET /webhooks/events?caseId={id}` with a short backoff until the event appears (or a ~30s timeout elapses) rather than reading it once immediately.\n\n**Guards:**\n- Returns 400 if the case is not a test case (`classification != test`), the event type is not valid, or the subscription is not found/not owned.\n- Returns 404 if the case is not found or not owned by this creditor.\n- Returns 422 if required data is missing (e.g. no payments for `payment.created`, no chats for `chat.created`).",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -2331,10 +3488,44 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "422": {
-            "description": "Business rule violation"
+            "description": "Business rule violation",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -2417,7 +3608,24 @@
             }
           },
           "404": {
-            "description": "Webhook not found"
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -2484,10 +3692,44 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Webhook not found"
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       },
@@ -2513,7 +3755,86 @@
             "description": "Webhook deleted successfully"
           },
           "404": {
-            "description": "Webhook not found"
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a test event to the webhook endpoint.",
+        "description": "Sends a synthetic case.created test event to the webhook endpoint.\n\nThis is useful for:\n- Verifying the webhook URL is reachable\n- Testing your webhook endpoint implementation\n- Validating signature verification\n\nThe test payload will be a realistic case.created event with synthetic data.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Test completed",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -2558,9 +3879,133 @@
             }
           },
           "404": {
-            "description": "Webhook not found"
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         }
+      }
+    },
+    "/webhooks/{id}/replay": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "[Deprecated] This endpoint is misnamed and does not actually replay events.\nUse `GET /webhooks/events?caseId={id}` to inspect delivery history,\nthen `POST /webhooks/events/{eventId}/replay` to re-deliver a specific event.",
+        "description": "This endpoint was never fully implemented — it counts cases created\nsince `sinceUtc` and returns the count as `eventsReplayed`, but does not\nre-enqueue or redeliver any events. The name \"replay\" collides with the real\n`POST /webhooks/events/{eventId}/replay` endpoint which actually re-delivers.\n            \nThis endpoint is kept for backward compatibility (additive-only rule) but is deprecated.\nIntegrators should migrate to the event-log + replay-by-id pattern described above.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Count of cases since sinceUtc (not events replayed)",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
       }
     },
     "/webhooks/{id}:replay": {
@@ -2627,10 +4072,44 @@
             }
           },
           "400": {
-            "description": "Invalid request"
+            "description": "Invalid request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Webhook not found"
+            "description": "Webhook not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "deprecated": true
@@ -3011,6 +4490,29 @@
         },
         "additionalProperties": false,
         "description": "Contract signing status for a case, showing SDCA and PoA status with signing URLs."
+      },
+      "Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"
+            },
+            "description": "Chronological list of events on the case.",
+            "nullable": true
+          },
+          "currentEngagementPhase": {
+            "type": "string",
+            "description": "The current engagement phase of the case, sourced from CaseEngagement.CurrentPhase.\nPossible values: \"Pre-legal\", \"Legal\", \"Enforcement\".\nNull when no active engagement exists (e.g. case not yet assigned to a partner).",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response envelope for GET /cases/{id}/timeline.\nWraps the chronological event list with case-level context\nthat cannot be expressed as a single timeline entry."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Cases.CollectionPartnerDto": {
         "type": "object",
@@ -3753,8 +5255,8 @@
         "example": {
           "currencyCode": "EUR",
           "amountToRecover": 4000,
-          "date": "2026-01-11",
-          "dueDate": "2026-01-19",
+          "date": "2026-01-17",
+          "dueDate": "2026-01-25",
           "claimDescription": "Custom mobile app development services",
           "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
           "creditorReference": "INV‑2024‑00789",
@@ -3938,6 +5440,26 @@
         "additionalProperties": false,
         "description": "Partner-facing handoff metadata for a creditor's pending signing chain.\nReturned on POST /cases responses (422 with pending-signing errors,\nor 200 with AllowPendingContracts=true when signings remain).\n            \nDesigned as an envelope so future fields (expiration, suggested email\ncopy, etc.) can be added without polluting the parent DTO."
       },
+      "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The type of actor. One of: \"System\", \"Creditor user\", \"Partner user\".",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the actor, if available.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Represents the actor (person or system) that performed a timeline action."
+      },
       "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto": {
         "required": [
           "description",
@@ -3961,6 +5483,9 @@
           "description": {
             "type": "string",
             "nullable": true
+          },
+          "actor": {
+            "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto"
           }
         },
         "additionalProperties": false
@@ -4243,6 +5768,31 @@
           }
         },
         "additionalProperties": false
+      },
+      "Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Short human-readable error label (legacy field — preserved for backward compatibility).",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error description (legacy field — preserved for backward compatibility).",
+            "nullable": true
+          },
+          "businessErrors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.BusinessErrorApiDTO"
+            },
+            "description": "Canonical structured error array. Consumers should migrate to reading this field.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic structured error response for API endpoints.\n            \nDual-write design: existing fields (Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Error / Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Message etc.)\nare preserved for backward compatibility alongside the canonical\nDebitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.BusinessErrors array, allowing consumers to migrate at their own pace."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Files.CaseFileDto": {
         "type": "object",

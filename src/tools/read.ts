@@ -78,8 +78,8 @@ function projectCaseSummary(c: Record<string, unknown>): Record<string, unknown>
 
 /** Project a full InvoiceDto for get_case — drops the creditor block (caller IS the creditor). */
 function projectCaseDetail(c: Record<string, unknown>): Record<string, unknown> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { creditor, ...rest } = c;
+  // Discard the creditor block via rest destructuring (allowed by ignoreRestSiblings).
+  const { creditor: _creditor, ...rest } = c;
   // Also strip surveyCadenceMode (raw numeric enum) from the collectionPartner block
   if (rest.collectionPartner && typeof rest.collectionPartner === "object") {
     const { surveyCadenceMode, ...partnerRest } = rest.collectionPartner as Record<string, unknown>;
@@ -238,7 +238,10 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       title: "Get Case Activity",
       description:
         "Fetch the chronological timeline of a case — what has happened so far: status changes, " +
-        "partner actions, communications, and payments.",
+        "partner actions, communications, and payments. " +
+        "Returns an envelope `{ items, currentEngagementPhase }`: `items` is the chronological event " +
+        "list, and `currentEngagementPhase` is the case's current engagement phase " +
+        '("Pre-legal", "Legal", or "Enforcement"; null when no active engagement exists).',
       inputSchema: {
         caseId: z.string().uuid().describe("Debitura case ID (GUID)"),
       },

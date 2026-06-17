@@ -57,11 +57,13 @@ async function main() {
   const names = tools.tools.map((t) => t.name).sort();
   const expected = [
     "create_case",
+    "get_account_summary",
     "get_case",
     "get_case_activity",
     "get_case_contract_status",
     "get_case_messages",
     "get_case_payments",
+    "list_case_files",
     "list_cases",
     "list_team_members",
     "ping",
@@ -70,7 +72,7 @@ async function main() {
     "upload_case_file",
   ];
   check(
-    "tools/list returns the 12 curated tools",
+    "tools/list returns the 14 curated tools",
     JSON.stringify(names) === JSON.stringify(expected),
     names.join(","),
   );

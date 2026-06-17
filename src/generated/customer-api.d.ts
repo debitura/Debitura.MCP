@@ -22,14 +22,19 @@ export interface paths {
          *     **Filters:**
          *     - statuses - Filter by case lifecycle status (comma-separated list)
          *       Valid values: PendingContractSigning, PendingVerificationInternal, PendingVerification,
-         *       NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed
+         *       NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged
+         *       (case-insensitive; both name and description forms accepted)
          *     - divisionIds - Filter by creditor division IDs (comma-separated GUIDs, for multi-division creditors)
          *     - debtorIds - Filter by specific debtor IDs (comma-separated GUIDs)
          *     - ids - Filter by specific case IDs (comma-separated GUIDs)
          *
          *     **Sorting:**
          *     - sort - Sort field and direction (format: 'field:direction')
-         *       Examples: 'date:desc', 'amount:asc', 'debtorName:asc'
+         *       Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,
+         *       DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,
+         *       Lifecycle, CloseCode
+         *       Examples: 'DateCreated:desc', 'DueDate:asc', 'GrossAmount:desc'
+         *       Unknown fields are silently ignored.
          *
          *     **Response:**
          *     - Returns InvoiceListApiDTO with page metadata and cases array
@@ -43,15 +48,19 @@ export interface paths {
                     DebtorIds?: string[];
                     Ids?: string[];
                     /**
-                     * @description Filter by case status. Available values depend on the API:
-                     *     - Customer API: Open, OnHold, PaymentPlan, Closed, Withdrawn, Completed, PendingContractSigning, PendingVerificationInternal, Unknown
-                     *     - Collection Partner API: PendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed
-                     *       (Partner API excludes PendingContractSigning/PendingVerificationInternal as those cases haven't been assigned to partners yet)
+                     * @description Filter by case lifecycle status. Valid values: PendingContractSigning, PendingVerificationInternal,
+                     *     PendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged
+                     *     (case-insensitive; both name and description forms accepted).
                      */
                     Statuses?: string[];
                     /** @description Optional list of division IDs to filter by */
                     DivisionIds?: string[];
-                    /** @description Optional sorting string "Field[:asc|desc][,Field2[:asc|desc]]…" */
+                    /**
+                     * @description Optional sorting string "Field[:asc|desc][,Field2[:asc|desc]]…".
+                     *     Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,
+                     *     DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,
+                     *     Lifecycle, CloseCode. Examples: 'DateCreated:desc', 'DueDate:asc'. Unknown fields are silently ignored.
+                     */
                     Sort?: string;
                 };
                 header?: never;
@@ -76,7 +85,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -115,7 +128,10 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
+                    "Idempotency-Key"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -144,7 +160,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Business rule violation */
                 422: {
@@ -162,7 +182,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -262,7 +286,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -310,14 +349,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found, deleted, or does not belong to your account */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -367,14 +414,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description No case found with this creditor reference */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -433,14 +488,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found, deleted, or does not belong to your account */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -490,14 +553,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Reference not found or case does not belong to your account */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -518,7 +589,11 @@ export interface paths {
         };
         /**
          * Fetch case timeline
-         * @description Returns the full event timeline for the case.
+         * @description Returns the full event timeline for the case along with the current engagement phase.
+         *
+         *     **Response shape:**
+         *     - `items` — chronological list of timeline events
+         *     - `currentEngagementPhase` — current phase of the active engagement: "Pre-legal", "Legal", or "Enforcement". Null when no active engagement exists.
          */
         get: {
             parameters: {
@@ -537,9 +612,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"][];
-                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"][];
-                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"][];
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse"];
                     };
                 };
                 /** @description ID missing */
@@ -547,14 +622,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -604,14 +687,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -667,9 +758,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
-                        "application/json": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
-                        "text/json": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
                     };
                 };
                 /** @description Case not found */
@@ -678,9 +769,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
-                        "application/json": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
-                        "text/json": components["schemas"]["Microsoft.AspNetCore.Mvc.ProblemDetails"];
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
                     };
                 };
                 /** @description Internal server error */
@@ -688,7 +779,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -736,14 +831,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -793,21 +896,33 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Server error */
                 500: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -866,35 +981,55 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description File too large */
                 413: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Unsupported file type */
                 415: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Server error */
                 500: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -942,14 +1077,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1000,14 +1143,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Quote request or case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1058,14 +1209,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Quote request or case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1117,14 +1276,33 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Quote, quote request, or case not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1169,12 +1347,27 @@ export interface paths {
                         "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.ExclusivePeriodDto"];
                     };
                 };
+                /** @description ID missing or empty */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
                 /** @description Case not found, does not belong to your account, or no collection period exists */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1228,14 +1421,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Case not found or does not belong to your account */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1378,7 +1579,77 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coverage/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * [DEPRECATED] Search for jurisdiction coverage
+         * @deprecated
+         * @description ⚠️ **DEPRECATED:** Use POST /coverage/check-eligibility instead.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Coverage item returned */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.CoverageItemApiDTO"];
+                    };
+                };
+                /** @description Search query missing or invalid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description No jurisdiction found matching the search query */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1429,14 +1700,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description No jurisdiction found matching the search query */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1507,7 +1786,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1576,7 +1859,10 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
+                    "Idempotency-Key"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -1605,7 +1891,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description Business rule violation */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1653,7 +1954,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1700,14 +2005,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Division not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1742,17 +2055,92 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Division cannot be deleted because it has active cases */
                 422: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/divisions/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a division.
+         * @description Archives a division, making it inactive. Archived divisions are excluded from list results by default.
+         *
+         *     **Important:** This action is irreversible. Archived divisions can still be referenced by existing cases.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Division archived successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"];
+                    };
+                };
+                /** @description Division not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description Division is already archived */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1800,14 +2188,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Division is already archived */
                 422: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1922,7 +2318,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -1972,14 +2372,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Payment not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -2270,8 +2678,8 @@ export interface paths {
          *     - If `subscriptionId` is provided, fires only to that subscription. Returns 400 if the subscription is not found, not a test subscription, or not owned by this creditor.
          *     - If omitted, fires to all active test subscriptions registered for the given event type.
          *
-         *     **Event log:**
-         *     The synthetic fire is enqueued into the normal delivery pipeline and recorded in the webhook event log (GET /webhooks/events) exactly like a real dispatch.
+         *     **Event log (asynchronous):**
+         *     The synthetic fire is enqueued into the normal delivery pipeline, exactly like a real dispatch. A successful response (and its `enqueuedCount`) confirms the event was queued — it does **not** mean a row already exists in the webhook event log. The `WebhookEvent` row appears in `GET /webhooks/events` only after the worker drains the queue and attempts delivery — usually within a few seconds, but allow up to ~30 seconds, as the queue drain can lag under load. Do not assume the row is present the instant this call returns: poll `GET /webhooks/events?caseId={id}` with a short backoff until the event appears (or a ~30s timeout elapses) rather than reading it once immediately.
          *
          *     **Guards:**
          *     - Returns 400 if the case is not a test case (`classification != test`), the event type is not valid, or the subscription is not found/not owned.
@@ -2676,14 +3084,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Business rule violation */
                 422: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -2731,7 +3147,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -2764,7 +3184,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -2815,17 +3239,86 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Webhook not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
+        trace?: never;
+    };
+    "/webhooks/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test event to the webhook endpoint.
+         * @description Sends a synthetic case.created test event to the webhook endpoint.
+         *
+         *     This is useful for:
+         *     - Verifying the webhook URL is reachable
+         *     - Testing your webhook endpoint implementation
+         *     - Validating signature verification
+         *
+         *     The test payload will be a realistic case.created event with synthetic data.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Test completed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.TestResultDto"];
+                    };
+                };
+                /** @description Webhook not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/webhooks/{id}:test": {
@@ -2875,7 +3368,92 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * [Deprecated] This endpoint is misnamed and does not actually replay events.
+         *     Use `GET /webhooks/events?caseId={id}` to inspect delivery history,
+         *     then `POST /webhooks/events/{eventId}/replay` to re-deliver a specific event.
+         * @deprecated
+         * @description This endpoint was never fully implemented — it counts cases created
+         *     since `sinceUtc` and returns the count as `eventsReplayed`, but does not
+         *     re-enqueue or redeliver any events. The name "replay" collides with the real
+         *     `POST /webhooks/events/{eventId}/replay` endpoint which actually re-delivers.
+         *
+         *     This endpoint is kept for backward compatibility (additive-only rule) but is deprecated.
+         *     Integrators should migrate to the event-log + replay-by-id pattern described above.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json-patch+json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"];
+                    "application/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"];
+                    "text/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"];
+                    "application/*+json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Requests.ReplayRequestDto"];
+                };
+            };
+            responses: {
+                /** @description Count of cases since sinceUtc (not events replayed) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Webhooks.Dtos.ReplayResultDto"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
+                };
+                /** @description Webhook not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -2941,14 +3519,22 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
                 /** @description Webhook not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "application/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                        "text/json": components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"];
+                    };
                 };
             };
         };
@@ -3123,6 +3709,21 @@ export interface components {
              *     and the Jurisdiction Pricing Appendix (presented as POA) is missing or stale.
              */
             needsPoaSigning?: boolean;
+        };
+        /**
+         * @description Response envelope for GET /cases/{id}/timeline.
+         *     Wraps the chronological event list with case-level context
+         *     that cannot be expressed as a single timeline entry.
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseTimelineResponse": {
+            /** @description Chronological list of events on the case. */
+            items: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto"][] | null;
+            /**
+             * @description The current engagement phase of the case, sourced from CaseEngagement.CurrentPhase.
+             *     Possible values: "Pre-legal", "Legal", "Enforcement".
+             *     Null when no active engagement exists (e.g. case not yet assigned to a partner).
+             */
+            currentEngagementPhase?: string | null;
         };
         /** @description V1 Collection Partner DTO for external partner APIs */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.CollectionPartnerDto": {
@@ -3544,8 +4145,8 @@ export interface components {
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-01-11",
-         *       "dueDate": "2026-01-19",
+         *       "date": "2026-01-17",
+         *       "dueDate": "2026-01-25",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
@@ -3924,12 +4525,20 @@ export interface components {
              */
             combinedSigningUrl?: string | null;
         };
+        /** @description Represents the actor (person or system) that performed a timeline action. */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto": {
+            /** @description The type of actor. One of: "System", "Creditor user", "Partner user". */
+            type: string | null;
+            /** @description Display name of the actor, if available. */
+            name?: string | null;
+        };
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineItemDto": {
             /** Format: date-time */
             date?: string;
             type: string | null;
             title: string | null;
             description: string | null;
+            actor?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto"];
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatDto": {
             /** Format: uuid */
@@ -4024,6 +4633,21 @@ export interface components {
             /** Format: email */
             officeEmail?: string | null;
             officePhone?: string | null;
+        };
+        /**
+         * @description Generic structured error response for API endpoints.
+         *
+         *     Dual-write design: existing fields (Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Error / Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Message etc.)
+         *     are preserved for backward compatibility alongside the canonical
+         *     Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.BusinessErrors array, allowing consumers to migrate at their own pace.
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto": {
+            /** @description Short human-readable error label (legacy field — preserved for backward compatibility). */
+            error?: string | null;
+            /** @description Human-readable error description (legacy field — preserved for backward compatibility). */
+            message?: string | null;
+            /** @description Canonical structured error array. Consumers should migrate to reading this field. */
+            businessErrors?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.BusinessErrorApiDTO"][] | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Files.CaseFileDto": {
             /** Format: uuid */
