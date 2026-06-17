@@ -203,6 +203,22 @@ describe("renderBusinessErrors", () => {
     });
     assert.match(out, /preview_case/);
   });
+
+  it("suppresses the generic hint for codes a caller overlay already handles", () => {
+    const body = {
+      businessErrors: [
+        { type: "DuplicateCreditorReference", message: "Dup.", solutionUrl: "https://x/dup" },
+      ],
+    };
+    const out = renderBusinessErrors(body, new Set(["DuplicateCreditorReference"]));
+    // The generic "use get_case" hint is dropped (the overlay restates it)...
+    assert.doesNotMatch(out, /get_case/);
+    // ...but the solutionUrl is data, not advice — it stays.
+    assert.match(out, /https:\/\/x\/dup/);
+    // Unsuppressed codes keep their generic hint.
+    const out2 = renderBusinessErrors(body);
+    assert.match(out2, /get_case/);
+  });
 });
 
 // ---------------------------------------------------------------------------

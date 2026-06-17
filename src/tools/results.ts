@@ -57,6 +57,15 @@ export interface BusinessErrorResponse {
  * on with the MCP tools it already has. Used when the error itself does not
  * carry a `solutionUrl` (or in addition to it) to point the agent at the right
  * next tool. Codes not listed here fall back to the generic per-error rendering.
+ *
+ * NOTE: lookup is an exact, case-sensitive string match on the API's `type`
+ * field. `MissingDebtCollectionContract`, `MissingPowerOfAttorney`, and
+ * `NoPartnerAvailable` are present in the shipped contract; the remaining keys
+ * (`DuplicateCreditorReference`, `UnsupportedCountry`, `UnsupportedCurrency`)
+ * are forward-provisioned per DEB-4633 item 3 — they take effect once the
+ * API-side issue emits these exact PascalCase codes. Any casing/spelling drift
+ * silently falls through to the generic per-error line (graceful, not a crash),
+ * so keep these strings in sync with the API as that side ships.
  */
 const BUSINESS_ERROR_HINTS: Record<string, string> = {
   DuplicateCreditorReference:
@@ -92,8 +101,17 @@ export function isBusinessErrorResponse(body: unknown): body is BusinessErrorRes
  * code is known, otherwise the per-error `solutionUrl`). When a combined
  * signing URL is present it is surfaced prominently at the top so the agent can
  * resolve every pending signing step through one link.
+ *
+ * `suppressHintsFor` lets a tool-specific caller (e.g. create_case) take over
+ * the recovery hint for certain codes: when a code is listed, its generic
+ * mapped hint is omitted so the caller's overlay is the single instruction for
+ * that error. The per-error `solutionUrl` line is still rendered regardless —
+ * the URL is data the agent needs, not duplicated advice.
  */
-export function renderBusinessErrors(body: BusinessErrorResponse): string {
+export function renderBusinessErrors(
+  body: BusinessErrorResponse,
+  suppressHintsFor?: ReadonlySet<string>,
+): string {
   const lines: string[] = [];
 
   const combinedSigningUrl = body.signingHandoff?.combinedSigningUrl;
@@ -107,11 +125,12 @@ export function renderBusinessErrors(body: BusinessErrorResponse): string {
   for (const err of errors) {
     const code = err.type ?? "UnknownBusinessError";
     const message = err.message ?? "Business rule violation.";
-    const hint = err.type ? BUSINESS_ERROR_HINTS[err.type] : undefined;
+    const hint =
+      err.type && !suppressHintsFor?.has(err.type) ? BUSINESS_ERROR_HINTS[err.type] : undefined;
 
     const nextStepParts: string[] = [];
     if (hint) nextStepParts.push(hint);
-    if (err.solutionUrl) nextStepParts.push(`Signing/solution URL: ${err.solutionUrl}`);
+    if (err.solutionUrl) nextStepParts.push(`Solution URL: ${err.solutionUrl}`);
     const nextStep = nextStepParts.length > 0 ? ` Next step: ${nextStepParts.join(" ")}` : "";
 
     lines.push(`- ${message} [${code}]${nextStep}`);
@@ -204,7 +223,9 @@ export function translateErrorBody(body: unknown): unknown {
  * stable code + a "Next step:" recovery hint, with any combined signing URL
  * surfaced prominently. `extraGuidance`, when supplied, is appended below the
  * rendered errors — used by tool-specific handlers (e.g. create_case) to add
- * context the generic renderer cannot know.
+ * context the generic renderer cannot know; `suppressHintsFor` then lets that
+ * handler suppress the generic hint for the codes its overlay already covers,
+ * so the agent reads one instruction per error rather than two near-duplicates.
  *
  * Other structured error responses (with `error` + `message` fields) are
  * translated: REST endpoint references are replaced with MCP tool names so
@@ -213,9 +234,14 @@ export function translateErrorBody(body: unknown): unknown {
  * Unstructured / legacy bodies render exactly as before — failing toward more
  * information rather than dropping anything the agent might need.
  */
-export function apiErrorResult(status: number, body: unknown, extraGuidance?: string): CallToolResult {
+export function apiErrorResult(
+  status: number,
+  body: unknown,
+  extraGuidance?: string,
+  suppressHintsFor?: ReadonlySet<string>,
+): CallToolResult {
   if (isBusinessErrorResponse(body)) {
-    const rendered = renderBusinessErrors(body);
+    const rendered = renderBusinessErrors(body, suppressHintsFor);
     const guidance = extraGuidance ? `\n\n${extraGuidance}` : "";
     return {
       isError: true,
