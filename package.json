@@ -15,7 +15,7 @@
     "dev": "tsx src/index.ts",
     "test": "tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate:types": "openapi-typescript openapi/customer-api.json -o src/generated/customer-api.d.ts",

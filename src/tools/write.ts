@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CustomerApiClient } from "../client.js";
-import { API_BASE_URL } from "../config.js";
+import { API_BASE_URL, SERVER_VERSION } from "../config.js";
 import { jsonResult, apiErrorResult, isBusinessErrorResponse } from "./results.js";
 
 const WRITE_ANNOTATIONS = {
@@ -17,7 +17,17 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
  * Allowed file extensions for upload_case_file.
  * Mirrors the allow-list enforced by the Debitura Customer API's file-upload endpoint.
  */
-const ALLOWED_EXTENSIONS = new Set([".pdf", ".xls", ".xlsx", ".csv", ".txt", ".jpg", ".jpeg", ".png", ".gif"]);
+const ALLOWED_EXTENSIONS = new Set([
+  ".pdf",
+  ".xls",
+  ".xlsx",
+  ".csv",
+  ".txt",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+]);
 
 export function registerWriteTools(
   server: McpServer,
@@ -43,7 +53,9 @@ export function registerWriteTools(
         currencyCode: z.string().length(3).describe('ISO 4217 currency code, e.g. "EUR"'),
         debtor: z
           .object({
-            type: z.enum(["Company", "Private"]).describe("Company (B2B) or Private individual (B2C)"),
+            type: z
+              .enum(["Company", "Private"])
+              .describe("Company (B2B) or Private individual (B2C)"),
             name: z.string().describe("Company name or person's full name"),
             contactPerson: z.string().optional().describe("Contact person (companies only)"),
             companyRegistrationNumber: z
@@ -62,9 +74,7 @@ export function registerWriteTools(
             phone: z.string().optional().describe("Debtor phone incl. country code"),
           })
           .describe("The debtor the claim is against"),
-        date: z
-          .string()
-          .describe("Invoice date (ISO 8601, e.g. 2026-03-01) — required by the API"),
+        date: z.string().describe("Invoice date (ISO 8601, e.g. 2026-03-01) — required by the API"),
         dueDate: z
           .string()
           .describe(
@@ -77,7 +87,9 @@ export function registerWriteTools(
         comments: z
           .string()
           .optional()
-          .describe("Context for the collection partner, e.g. payment history or prior communication"),
+          .describe(
+            "Context for the collection partner, e.g. payment history or prior communication",
+          ),
         creditorReference: z
           .string()
           .max(50)
@@ -88,7 +100,9 @@ export function registerWriteTools(
         assignedUserEmail: z
           .string()
           .optional()
-          .describe("Email of the team member to own the case (use list_team_members to find valid team members)"),
+          .describe(
+            "Email of the team member to own the case (use list_team_members to find valid team members)",
+          ),
         allowPendingContracts: z
           .boolean()
           .optional()
@@ -195,7 +209,7 @@ export function registerWriteTools(
           .optional()
           .describe(
             "Document category (default: OriginalInvoice). " +
-            "Values: OriginalInvoice · DebtorDocuments · CreditorDocuments · PartnerDocuments · DemandLetter · Miscellaneous",
+              "Values: OriginalInvoice · DebtorDocuments · CreditorDocuments · PartnerDocuments · DemandLetter · Miscellaneous",
           ),
       },
       annotations: { title: "Upload Case File", ...WRITE_ANNOTATIONS, idempotentHint: false },
@@ -209,8 +223,7 @@ export function registerWriteTools(
           content: [
             {
               type: "text",
-              text:
-                `File extension "${ext}" is not allowed. Supported extensions: ${[...ALLOWED_EXTENSIONS].join(", ")}.`,
+              text: `File extension "${ext}" is not allowed. Supported extensions: ${[...ALLOWED_EXTENSIONS].join(", ")}.`,
             },
           ],
         };
@@ -220,7 +233,10 @@ export function registerWriteTools(
       try {
         bytes = Buffer.from(contentBase64, "base64");
       } catch {
-        return { isError: true, content: [{ type: "text", text: "contentBase64 is not valid base64." }] };
+        return {
+          isError: true,
+          content: [{ type: "text", text: "contentBase64 is not valid base64." }],
+        };
       }
       if (bytes.length === 0) {
         return { isError: true, content: [{ type: "text", text: "Decoded file is empty." }] };
@@ -228,7 +244,9 @@ export function registerWriteTools(
       if (bytes.length > MAX_FILE_BYTES) {
         return {
           isError: true,
-          content: [{ type: "text", text: `File is ${bytes.length} bytes — exceeds the 25 MB limit.` }],
+          content: [
+            { type: "text", text: `File is ${bytes.length} bytes — exceeds the 25 MB limit.` },
+          ],
         };
       }
 
@@ -243,7 +261,8 @@ export function registerWriteTools(
 
       const response = await fetch(`${API_BASE_URL}/cases/${caseId}/files`, {
         method: "POST",
-        headers: { XApiKey: apiKey },
+        // multipart upload bypasses the typed client; match its XApiKey + User-Agent headers.
+        headers: { XApiKey: apiKey, "User-Agent": `debitura-mcp/${SERVER_VERSION}` },
         body: form,
       });
       const responseBody = await response.json().catch(() => undefined);

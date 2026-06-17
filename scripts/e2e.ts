@@ -79,11 +79,19 @@ async function main() {
   const unannotated = tools.tools.filter(
     (t) => !t.annotations || t.annotations.readOnlyHint === undefined || !t.title,
   );
-  check("every tool has title + annotations", unannotated.length === 0, unannotated.map((t) => t.name).join(","));
+  check(
+    "every tool has title + annotations",
+    unannotated.length === 0,
+    unannotated.map((t) => t.name).join(","),
+  );
 
   // ping
   const ping = await call(client, "ping", {});
-  check("ping → connected as creditor", !ping.isError && ping.text.includes("✓ Connected as"), ping.text.split("\n")[0]);
+  check(
+    "ping → connected as creditor",
+    !ping.isError && ping.text.includes("✓ Connected as"),
+    ping.text.split("\n")[0],
+  );
 
   // list_cases
   const list = await call(client, "list_cases", { page: 1, pageSize: 5 });
@@ -96,13 +104,20 @@ async function main() {
     debtorType: "Company",
     debtorCountryAlpha2: "DE",
   });
-  check("preview_case (DE company, 5000 EUR)", !preview.isError, preview.isError ? preview.text.slice(0, 300) : undefined);
+  check(
+    "preview_case (DE company, 5000 EUR)",
+    !preview.isError,
+    preview.isError ? preview.text.slice(0, 300) : undefined,
+  );
 
   // list_team_members
   const team = await call(client, "list_team_members", {});
   check("list_team_members", !team.isError);
   const teamData = parse(team.text);
-  const sender = teamData?.users?.[0] ?? teamData?.results?.[0] ?? (Array.isArray(teamData) ? teamData[0] : undefined);
+  const sender =
+    teamData?.users?.[0] ??
+    teamData?.results?.[0] ??
+    (Array.isArray(teamData) ? teamData[0] : undefined);
 
   // create_case (test data)
   const created = await call(client, "create_case", {
@@ -124,7 +139,11 @@ async function main() {
     isTest: true,
     tag: TAG,
   });
-  check("create_case (isTest, tagged)", !created.isError, created.isError ? created.text.slice(0, 300) : undefined);
+  check(
+    "create_case (isTest, tagged)",
+    !created.isError,
+    created.isError ? created.text.slice(0, 300) : undefined,
+  );
   const createdCase = parse(created.text);
   const caseId: string | undefined = createdCase?.id;
   check("create_case returned a case id", !!caseId, caseId);
@@ -154,7 +173,11 @@ async function main() {
       ).toString("base64"),
       description: "MCP E2E upload",
     });
-    check("upload_case_file", !upload.isError, upload.isError ? upload.text.slice(0, 300) : undefined);
+    check(
+      "upload_case_file",
+      !upload.isError,
+      upload.isError ? upload.text.slice(0, 300) : undefined,
+    );
 
     const noSender = await call(client, "send_case_message", {
       caseId,
@@ -168,7 +191,11 @@ async function main() {
         message: "MCP connector E2E test message — please ignore.",
         ...(sender.id ? { senderUserId: sender.id } : { senderEmail: sender.email }),
       });
-      check("send_case_message with sender", !sent.isError, sent.isError ? sent.text.slice(0, 300) : undefined);
+      check(
+        "send_case_message with sender",
+        !sent.isError,
+        sent.isError ? sent.text.slice(0, 300) : undefined,
+      );
     } else {
       check("send_case_message with sender (skipped — no team member found)", true);
     }
@@ -185,7 +212,11 @@ async function main() {
     method: "DELETE",
     headers: { XApiKey: API_KEY! },
   });
-  check("cleanup tagged test cases", cleanup.ok || cleanup.status === 404, `HTTP ${cleanup.status}`);
+  check(
+    "cleanup tagged test cases",
+    cleanup.ok || cleanup.status === 404,
+    `HTTP ${cleanup.status}`,
+  );
 
   console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) FAILED.`);
   process.exit(failures === 0 ? 0 : 1);

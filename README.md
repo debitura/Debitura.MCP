@@ -14,27 +14,27 @@ on a no-cure-no-pay basis.
 
 ### Read
 
-| Tool | What it does |
-|---|---|
-| `ping` | Test the connection — "✓ Connected as {your company}" |
-| `list_cases` | List your collection cases (paging, status filter, sorting) |
-| `get_case` | Fetch one case by ID, your own reference, or Debitura case reference |
-| `get_case_activity` | Case timeline — what has happened so far (returns `{ items, currentEngagementPhase }`) |
-| `get_case_messages` | Read the chat with the collection partner |
-| `get_case_payments` | Money recovered on a case |
-| `get_case_contract_status` | Which contracts are signed / blocking a case |
-| `list_case_files` | List documents attached to a case, with time-limited download URLs |
-| `get_account_summary` | Case counts per lifecycle stage — a quick portfolio overview |
-| `preview_case` | Pricing + eligibility dry-run before submitting (nothing persisted) |
-| `list_team_members` | Your team — used to attribute messages and assign case owners |
+| Tool                       | What it does                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `ping`                     | Test the connection — "✓ Connected as {your company}"                                  |
+| `list_cases`               | List your collection cases (paging, status filter, sorting)                            |
+| `get_case`                 | Fetch one case by ID, your own reference, or Debitura case reference                   |
+| `get_case_activity`        | Case timeline — what has happened so far (returns `{ items, currentEngagementPhase }`) |
+| `get_case_messages`        | Read the chat with the collection partner                                              |
+| `get_case_payments`        | Money recovered on a case                                                              |
+| `get_case_contract_status` | Which contracts are signed / blocking a case                                           |
+| `list_case_files`          | List documents attached to a case, with time-limited download URLs                     |
+| `get_account_summary`      | Case counts per lifecycle stage — a quick portfolio overview                           |
+| `preview_case`             | Pricing + eligibility dry-run before submitting (nothing persisted)                    |
+| `list_team_members`        | Your team — used to attribute messages and assign case owners                          |
 
 ### Write
 
-| Tool | What it does |
-|---|---|
-| `create_case` | Submit a collection case. Safety-wrapped: preview first → explicit user confirmation → idempotent submit (auto `Idempotency-Key`, safe retries, no duplicate cases) |
-| `upload_case_file` | Attach documents to a case (invoice copies, contracts — max 25 MB) |
-| `send_case_message` | Message the collection partner on a case, attributed to a named team member |
+| Tool                | What it does                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_case`       | Submit a collection case. Safety-wrapped: preview first → explicit user confirmation → idempotent submit (auto `Idempotency-Key`, safe retries, no duplicate cases) |
+| `upload_case_file`  | Attach documents to a case (invoice copies, contracts — max 25 MB)                                                                                                  |
+| `send_case_message` | Message the collection partner on a case, attributed to a named team member                                                                                         |
 
 Every tool carries proper MCP annotations (`readOnlyHint` / `destructiveHint`), and `create_case`
 never auto-fires — it is a legal/financial action and always requires explicit human confirmation.
@@ -85,14 +85,14 @@ code --add-mcp '{"name":"debitura","type":"http","url":"https://mcp.debitura.com
 
 ### Verify
 
-Ask your assistant: *"Ping Debitura"* → you should see `✓ Connected as {your company}`.
+Ask your assistant: _"Ping Debitura"_ → you should see `✓ Connected as {your company}`.
 
 ## Example prompts
 
-- *"What's the status of my Debitura cases? Anything that needs my attention?"*
-- *"What would it cost to collect a €12,000 B2B debt in Germany?"*
-- *"Any new messages from collection partners this week?"*
-- *"Submit a collection case against Acme GmbH in Berlin for invoice 2026-014, €8,400, due 1 March."*
+- _"What's the status of my Debitura cases? Anything that needs my attention?"_
+- _"What would it cost to collect a €12,000 B2B debt in Germany?"_
+- _"Any new messages from collection partners this week?"_
+- _"Submit a collection case against Acme GmbH in Berlin for invoice 2026-014, €8,400, due 1 March."_
 
 ## Security
 
@@ -115,9 +115,9 @@ npm install
 npm run dev          # starts on :3000, POST /mcp
 ```
 
-| Env var | Default | Purpose |
-|---|---|---|
-| `PORT` | `3000` | Listen port |
+| Env var                 | Default                             | Purpose                                                                   |
+| ----------------------- | ----------------------------------- | ------------------------------------------------------------------------- |
+| `PORT`                  | `3000`                              | Listen port                                                               |
 | `DEBITURA_API_BASE_URL` | `https://customer-api.debitura.com` | Point at `https://testcustomer-api.debitura.com` for the test environment |
 
 See [`.env.example`](./.env.example) for a starter env file.
@@ -149,6 +149,12 @@ hand-written:
 ```bash
 npm run fetch:spec   # pull latest spec + regenerate src/generated/customer-api.d.ts
 ```
+
+### Releasing a new version
+
+The version lives in **`package.json`** (`config.ts` and `client.ts` derive from it). When bumping
+it, also update **`server.json`** and **`smithery.yaml`** — the registry manifests carry the version
+independently and must match the published listing.
 
 ## About Debitura
 

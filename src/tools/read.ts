@@ -48,10 +48,14 @@ const SORTABLE_FIELDS = new Set([
 function chatRoleLabel(role: number | undefined, existingLabel: string | null | undefined): string {
   if (existingLabel) return existingLabel;
   switch (role) {
-    case 0: return "Creditor";
-    case 1: return "Partner";
-    case 2: return "System";
-    default: return "Unknown";
+    case 0:
+      return "Creditor";
+    case 1:
+      return "Partner";
+    case 2:
+      return "System";
+    default:
+      return "Unknown";
   }
 }
 
@@ -127,22 +131,33 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         "Sort format: `Field:asc` or `Field:desc`, e.g. `GrossAmount:desc`\n\n" +
         "Note: results include the creditor's own test cases; the `isTestCase` flag on each case marks them.",
       inputSchema: {
-        page: z.number().int().min(1).optional().describe("Page number, starting from 1 (default 1)"),
-        pageSize: z.number().int().min(1).max(100).optional().describe("Results per page (default 10, max 100)"),
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("Page number, starting from 1 (default 1)"),
+        pageSize: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Results per page (default 10, max 100)"),
         statuses: z
           .array(z.enum(LIFECYCLE_VALUES as unknown as [string, ...string[]]))
           .optional()
           .describe(
             "Filter by lifecycle status. Values: PendingContractSigning, PendingVerificationInternal, " +
-            "PendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged",
+              "PendingVerification, NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged",
           ),
         sort: z
           .string()
           .optional()
           .describe(
             "Sort expression: Field:asc or Field:desc. " +
-            "Valid fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted, DueDate, Date, " +
-            "GrossAmount, Remainder, InterestFees, CollectionFees. Example: GrossAmount:desc",
+              "Valid fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted, DueDate, Date, " +
+              "GrossAmount, Remainder, InterestFees, CollectionFees. Example: GrossAmount:desc",
           ),
       },
       annotations: { title: "List Cases", ...READ_ANNOTATIONS },
@@ -284,7 +299,10 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         const rawMessage = (msg.message as string | null | undefined) ?? "";
         return {
           senderName,
-          role: chatRoleLabel(msg.role as number | undefined, msg.roleLabel as string | null | undefined),
+          role: chatRoleLabel(
+            msg.role as number | undefined,
+            msg.roleLabel as string | null | undefined,
+          ),
           sentAt: msg.dateCreated,
           message: rawMessage.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
         };
@@ -342,10 +360,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         "partner, pricing (success fee), and any contracts that would need signing. Nothing is persisted. " +
         "ALWAYS call this before create_case and show the user the pricing and requirements.",
       inputSchema: {
-        amountToRecover: z
-          .number()
-          .positive()
-          .describe("Total principal amount to recover"),
+        amountToRecover: z.number().positive().describe("Total principal amount to recover"),
         currencyCode: z
           .string()
           .length(3)
@@ -368,7 +383,14 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       },
       annotations: { title: "Preview Case (Pricing & Eligibility)", ...READ_ANNOTATIONS },
     },
-    async ({ amountToRecover, currencyCode, debtorType, debtorCountryAlpha2, debtorStateAlpha2, dueDate }) => {
+    async ({
+      amountToRecover,
+      currencyCode,
+      debtorType,
+      debtorCountryAlpha2,
+      debtorStateAlpha2,
+      dueDate,
+    }) => {
       // Pre-validate US state requirement
       if (debtorCountryAlpha2.toUpperCase() === "US" && !debtorStateAlpha2) {
         return {
@@ -376,7 +398,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
           content: [
             {
               type: "text",
-              text: "debtorStateAlpha2 is required for US debtors. Provide the two-letter state code, e.g. \"CA\" for California.",
+              text: 'debtorStateAlpha2 is required for US debtors. Provide the two-letter state code, e.g. "CA" for California.',
             },
           ],
         };
@@ -475,7 +497,11 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
             params: { query: { Statuses: [lifecycle], PageSize: 1, Page: 1 } },
           });
           if (!data) {
-            return { lifecycle, count: null as number | null, error: `HTTP ${response.status}: ${JSON.stringify(error)}` };
+            return {
+              lifecycle,
+              count: null as number | null,
+              error: `HTTP ${response.status}: ${JSON.stringify(error)}`,
+            };
           }
           return { lifecycle, count: data.page?.totalResults ?? 0, error: null };
         }),
