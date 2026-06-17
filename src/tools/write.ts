@@ -333,11 +333,9 @@ function createCaseGuidance(
     );
   }
 
-  if (codes.has("UnsupportedCountry") || codes.has("UnsupportedCurrency") || codes.has("NoPartnerAvailable")) {
-    tips.push(
-      "This case is not eligible as submitted. Call preview_case with the same country/currency to confirm eligibility before retrying.",
-    );
-  }
+  // UnsupportedCountry/Currency and NoPartnerAvailable are covered by the generic
+  // per-error hints (preview_case for eligibility) — no create_case-specific
+  // overlay needed, so they intentionally fall through to the rendered lines.
 
   return tips.length > 0 ? tips.join("\n") : undefined;
 }
