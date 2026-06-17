@@ -2,6 +2,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CustomerApiClient } from "../client.js";
 import { jsonResult, textResult, apiErrorResult } from "./results.js";
+import {
+  LIFECYCLE_VALUES,
+  chatRoleLabel,
+  toUtcIso,
+  sasExpiry,
+  normalizeTimestamps,
+} from "../domain.js";
 
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
@@ -9,23 +16,6 @@ const READ_ANNOTATIONS = {
   idempotentHint: true,
   openWorldHint: false,
 } as const;
-
-/**
- * Valid lifecycle enum values (InvoicePartnerLifecycle).
- * These are the values the API accepts for Statuses filtering and returns as lifecycle labels.
- */
-const LIFECYCLE_VALUES = [
-  "PendingContractSigning",
-  "PendingVerificationInternal",
-  "PendingVerification",
-  "NeedsAdditionalDetails",
-  "Leads",
-  "LeadsQuoteGiven",
-  "Active",
-  "Paused",
-  "Closed",
-  "Merged",
-] as const;
 
 /**
  * Valid sort field names accepted by the API.
@@ -44,21 +34,6 @@ const SORTABLE_FIELDS = new Set([
   "CollectionFees",
 ]);
 
-/** Map a numeric ChatRole to a human-readable label. */
-function chatRoleLabel(role: number | undefined, existingLabel: string | null | undefined): string {
-  if (existingLabel) return existingLabel;
-  switch (role) {
-    case 0:
-      return "Creditor";
-    case 1:
-      return "Partner";
-    case 2:
-      return "System";
-    default:
-      return "Unknown";
-  }
-}
-
 /** Project a full InvoiceDto down to a compact summary for list_cases. */
 function projectCaseSummary(c: Record<string, unknown>): Record<string, unknown> {
   const debtor = (c.debtor ?? {}) as Record<string, unknown>;
@@ -74,8 +49,8 @@ function projectCaseSummary(c: Record<string, unknown>): Record<string, unknown>
     remainder: c.remainder,
     lifecycle: c.lifecycle,
     partnerName: partner.name ?? null,
-    dateCreated: c.dateCreated,
-    dueDate: c.dueDate,
+    dateCreated: toUtcIso(c.dateCreated),
+    dueDate: toUtcIso(c.dueDate),
     isTestCase: c.isTestCase,
   };
 }
@@ -90,7 +65,8 @@ function projectCaseDetail(c: Record<string, unknown>): Record<string, unknown> 
     void surveyCadenceMode;
     rest.collectionPartner = partnerRest;
   }
-  return rest;
+  // Normalize every nested naive timestamp to offset-aware UTC.
+  return normalizeTimestamps(rest);
 }
 
 export function registerReadTools(server: McpServer, api: CustomerApiClient): void {
@@ -267,7 +243,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         params: { path: { id: caseId } },
       });
       if (!data) return apiErrorResult(response.status, error);
-      return jsonResult(data);
+      return jsonResult(normalizeTimestamps(data));
     },
   );
 
@@ -303,7 +279,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
             msg.role as number | undefined,
             msg.roleLabel as string | null | undefined,
           ),
-          sentAt: msg.dateCreated,
+          sentAt: toUtcIso(msg.dateCreated),
           message: rawMessage.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
         };
       });
@@ -326,7 +302,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         params: { path: { id: caseId } },
       });
       if (!data) return apiErrorResult(response.status, error);
-      return jsonResult(data);
+      return jsonResult(normalizeTimestamps(data));
     },
   );
 
@@ -347,7 +323,7 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         params: { path: { id: caseId } },
       });
       if (!data) return apiErrorResult(response.status, error);
-      return jsonResult(data);
+      return jsonResult(normalizeTimestamps(data));
     },
   );
 
@@ -449,7 +425,9 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       title: "List Case Files",
       description:
         "List all documents attached to a case: file name, document type, description, upload date, " +
-        "and a time-limited SAS download URL. Use upload_case_file to attach new documents.",
+        "and a time-limited SAS download URL. Each file also carries downloadUrlExpiresAt (UTC) — when " +
+        "the download URL stops working, so a cached URL can be refreshed in time. " +
+        "Use upload_case_file to attach new documents.",
       inputSchema: {
         caseId: z.string().uuid().describe("Debitura case ID (GUID)"),
       },
@@ -468,8 +446,11 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
           fileName: file.fileName,
           documentType: file.documentType,
           description: file.description,
-          uploadedAt: file.dateCreated,
+          uploadedAt: toUtcIso(file.dateCreated),
           downloadUrl: file.url,
+          // Expiry of the SAS download URL (from its `se` param), so a consumer
+          // caching the URL knows when it stops working; null if not present.
+          downloadUrlExpiresAt: sasExpiry(file.url),
         };
       });
       return jsonResult(files);

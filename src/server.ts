@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createApiClient } from "./client.js";
 import { registerReadTools } from "./tools/read.js";
 import { registerWriteTools } from "./tools/write.js";
+import { registerResources, registerPrompts } from "./resources.js";
 import { SERVER_NAME, SERVER_VERSION } from "./config.js";
 
 /**
@@ -28,5 +29,8 @@ export function buildServer(apiKey: string): McpServer {
   const api = createApiClient(apiKey);
   registerReadTools(server, api);
   registerWriteTools(server, api, apiKey);
+  // Static domain knowledge + ready-made prompts (no API key needed — same per-request path).
+  registerResources(server);
+  registerPrompts(server);
   return server;
 }

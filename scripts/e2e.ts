@@ -85,6 +85,42 @@ async function main() {
     unannotated.map((t) => t.name).join(","),
   );
 
+  // resources/list — static domain-knowledge glossaries
+  const resources = await client.listResources();
+  const resourceUris = resources.resources.map((r) => r.uri).sort();
+  const expectedResources = [
+    "debitura://glossary/case-lifecycle",
+    "debitura://glossary/chat-roles",
+    "debitura://reference/coverage-pricing",
+  ];
+  check(
+    "resources/list returns the 3 domain-knowledge resources",
+    JSON.stringify(resourceUris) === JSON.stringify(expectedResources),
+    resourceUris.join(","),
+  );
+  // resources/read on each — confirm non-empty markdown comes back
+  for (const uri of expectedResources) {
+    const read = await client.readResource({ uri });
+    const text = (read.contents as Array<{ text?: string }>).map((c) => c.text ?? "").join("");
+    check(`resources/read ${uri}`, text.length > 0);
+  }
+
+  // prompts/list
+  const prompts = await client.listPrompts();
+  const promptNames = prompts.prompts.map((p) => p.name).sort();
+  const expectedPrompts = ["draft_partner_update", "review_overdue_portfolio"];
+  check(
+    "prompts/list returns the curated prompts",
+    JSON.stringify(promptNames) === JSON.stringify(expectedPrompts),
+    promptNames.join(","),
+  );
+  // prompts/get on the zero-arg portfolio prompt — confirm it returns messages
+  const portfolioPrompt = await client.getPrompt({ name: "review_overdue_portfolio" });
+  check(
+    "prompts/get review_overdue_portfolio returns messages",
+    portfolioPrompt.messages.length > 0,
+  );
+
   // ping
   const ping = await call(client, "ping", {});
   check(
