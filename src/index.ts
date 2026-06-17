@@ -76,7 +76,10 @@ app.post("/mcp", async (req: Request, res: Response) => {
 const methodNotAllowed = (_req: Request, res: Response) => {
   res.status(405).json({
     jsonrpc: "2.0",
-    error: { code: -32000, message: "Method not allowed. This server is stateless — POST /mcp only." },
+    error: {
+      code: -32000,
+      message: "Method not allowed. This server is stateless — POST /mcp only.",
+    },
     id: null,
   });
 };

@@ -62,8 +62,8 @@ export interface BusinessErrorResponse {
  * field. `MissingDebtCollectionContract`, `MissingPowerOfAttorney`, and
  * `NoPartnerAvailable` are present in the shipped contract; the remaining keys
  * (`DuplicateCreditorReference`, `UnsupportedCountry`, `UnsupportedCurrency`)
- * are forward-provisioned per DEB-4633 item 3 — they take effect once the
- * API-side issue emits these exact PascalCase codes. Any casing/spelling drift
+ * are forward-provisioned — they take effect once the API emits these exact
+ * PascalCase codes. Any casing/spelling drift
  * silently falls through to the generic per-error line (graceful, not a crash),
  * so keep these strings in sync with the API as that side ships.
  */
@@ -154,7 +154,7 @@ export function stripRestSentences(message: string): string | null {
   // Each segment retains its own terminal punctuation so rejoin is clean.
   // Dots inside tokens (emails, decimals) are not followed by whitespace, so they survive.
   const parts = message.split(/(?<=[.?!])\s+/);
-  const kept = parts.filter(p => !REST_VERB_PATH.test(p));
+  const kept = parts.filter((p) => !REST_VERB_PATH.test(p));
   if (kept.length === 0) return null;
   const joined = kept.join(" ");
   // If the original ended with terminal punctuation but the joined result does not

@@ -241,7 +241,7 @@ describe("apiErrorResult", () => {
     const result = apiErrorResult(
       422,
       { businessErrors: [{ type: "DuplicateCreditorReference", message: "Dup." }] },
-      "Call get_case with creditorReference \"INV-1\".",
+      'Call get_case with creditorReference "INV-1".',
     );
     const text = resultText(result);
     assert.match(text, /INV-1/);
