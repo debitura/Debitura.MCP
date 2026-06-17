@@ -153,8 +153,9 @@ npm run fetch:spec   # pull latest spec + regenerate src/generated/customer-api.
 ### Releasing a new version
 
 The version lives in **`package.json`** (`config.ts` and `client.ts` derive from it). When bumping
-it, also update **`server.json`** and **`smithery.yaml`** — the registry manifests carry the version
-independently and must match the published listing.
+it, also update **`server.json`** — its `version` field is independent and must match the published
+registry listing. (`smithery.yaml` has no version field; Smithery picks up the package version
+automatically.)
 
 ## About Debitura
 
