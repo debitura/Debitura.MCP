@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CustomerApiClient } from "../client.js";
 import { API_BASE_URL } from "../config.js";
-import { jsonResult, apiErrorResult } from "./results.js";
+import { jsonResult, apiErrorResult, isBusinessErrorResponse } from "./results.js";
 
 const WRITE_ANNOTATIONS = {
   readOnlyHint: false,
@@ -148,7 +148,8 @@ export function registerWriteTools(
           if (data) return jsonResult(data);
           // Retry only transient upstream failures; everything else is final.
           if ([502, 503, 504].includes(response.status) && i < 2) continue;
-          return apiErrorResult(response.status, error);
+          const overlay = createCaseGuidance(response.status, error, input.creditorReference);
+          return apiErrorResult(response.status, error, overlay?.guidance, overlay?.handledCodes);
         } catch (err) {
           lastError = err; // network-level failure — safe to retry with the same key
         }
@@ -295,6 +296,59 @@ export function registerWriteTools(
       return jsonResult(data);
     },
   );
+}
+
+/**
+ * create_case-specific overlay for the 422 business rejection.
+ *
+ * The generic renderer in apiErrorResult already turns each business error into
+ * an actionable line. This adds context only create_case knows about:
+ *  - a duplicate creditorReference should be looked up with `get_case` using the
+ *    exact reference the agent just submitted, and
+ *  - a missing debt collection contract means the user must sign before retry —
+ *    point the agent at the signing URL in the rendered payload as the action.
+ *
+ * Returns undefined for non-business or unrecognised errors so nothing extra is
+ * appended (graceful fallback — the body renders exactly as it otherwise would).
+ *
+ * When it does fire, it reports `handledCodes` — the business-error codes whose
+ * recovery advice this overlay fully restates (with create_case-specific detail
+ * like the exact creditorReference). The caller passes these to apiErrorResult
+ * so the generic per-error hint for those codes is suppressed, leaving one
+ * crisp instruction per error instead of two overlapping ones.
+ */
+function createCaseGuidance(
+  status: number,
+  body: unknown,
+  creditorReference: string | undefined,
+): { guidance: string; handledCodes: Set<string> } | undefined {
+  if (status !== 422 || !isBusinessErrorResponse(body)) return undefined;
+
+  const codes = new Set((body.businessErrors ?? []).map((e) => e.type).filter(Boolean) as string[]);
+  const tips: string[] = [];
+  const handledCodes = new Set<string>();
+
+  if (codes.has("DuplicateCreditorReference")) {
+    const ref = creditorReference ? ` "${creditorReference}"` : "";
+    tips.push(
+      `A case with creditorReference${ref} already exists. Do NOT retry create_case — call get_case with creditorReference${ref} to retrieve the existing case.`,
+    );
+    handledCodes.add("DuplicateCreditorReference");
+  }
+
+  if (codes.has("MissingDebtCollectionContract") || codes.has("MissingPowerOfAttorney")) {
+    tips.push(
+      "A required contract is unsigned. Present the signing URL above to the user (the combined signing link if shown), then retry create_case once signing is complete — or pass allowPendingContracts to queue the case in PendingContractSigning.",
+    );
+    handledCodes.add("MissingDebtCollectionContract");
+    handledCodes.add("MissingPowerOfAttorney");
+  }
+
+  // UnsupportedCountry/Currency and NoPartnerAvailable are covered by the generic
+  // per-error hints (preview_case for eligibility) — no create_case-specific
+  // overlay needed, so they intentionally fall through to the rendered lines.
+
+  return tips.length > 0 ? { guidance: tips.join("\n"), handledCodes } : undefined;
 }
 
 function guessMimeType(fileName: string): string {
