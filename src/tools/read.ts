@@ -253,7 +253,8 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       title: "Get Case Messages",
       description:
         "Read the chat conversation on a case between you and the collection partner handling it. " +
-        "Each message includes: senderName, role (Creditor / Partner / System), sentAt, message.",
+        "Each message includes: senderName, role (Creditor / Partner / Managed by partner), sentAt (UTC), message. " +
+        "See the debitura://glossary/chat-roles resource for what each role means.",
       inputSchema: {
         caseId: z.string().uuid().describe("Debitura case ID (GUID)"),
       },

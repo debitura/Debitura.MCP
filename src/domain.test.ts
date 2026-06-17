@@ -116,14 +116,15 @@ describe("normalizeTimestamps", () => {
 // ---------------------------------------------------------------------------
 
 describe("chatRoleLabel", () => {
-  it("maps known role ints", () => {
-    assert.equal(chatRoleLabel(0, null), "Creditor");
-    assert.equal(chatRoleLabel(1, null), "Partner");
-    assert.equal(chatRoleLabel(2, null), "System");
+  it("maps known role ints to the real ChatRole enum (0=Partner, 1=Creditor, 2=ManagedByPartner)", () => {
+    assert.equal(chatRoleLabel(0, null), "Partner");
+    assert.equal(chatRoleLabel(1, null), "Creditor");
+    assert.equal(chatRoleLabel(2, null), "Managed by partner");
   });
 
   it("prefers an existing label when present", () => {
-    assert.equal(chatRoleLabel(0, "Custom"), "Custom");
+    // The API always sends roleLabel; the numeric fallback is only for its absence.
+    assert.equal(chatRoleLabel(0, "Creditor"), "Creditor");
   });
 
   it("falls back to Unknown for unknown / missing roles", () => {

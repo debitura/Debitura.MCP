@@ -26,8 +26,8 @@ import {
 
 function caseLifecycleGlossary(): string {
   const rows = LIFECYCLE_VALUES.map((v) => {
-    const { state, description } = LIFECYCLE_DESCRIPTIONS[v];
-    return `| \`${v}\` | ${state} | ${description} |`;
+    const { label, state, description } = LIFECYCLE_DESCRIPTIONS[v];
+    return `| \`${v}\` | ${label} | ${state} | ${description} |`;
   }).join("\n");
 
   const closeRows = CLOSE_CODE_DESCRIPTIONS.map(
@@ -36,13 +36,15 @@ function caseLifecycleGlossary(): string {
 
   return `# Debitura case lifecycle & status glossary
 
-Every case carries a \`lifecycle\` stage. These are the exact values returned by
-\`get_case\` / \`list_cases\` and accepted by the \`statuses\` filter on \`list_cases\`.
+Every case carries a \`lifecycle\` stage. The **Filter value** column is the enum
+name you pass to the \`statuses\` filter on \`list_cases\`; the **Returned label**
+column is the human text the case actually shows for that stage (these can differ,
+e.g. \`NeedsAdditionalDetails\` is displayed as "More Info Required").
 
 A case is either **Active** (still open / in progress) or **Closed** (finished).
 
-| Lifecycle stage | Open/Closed | Meaning |
-|---|---|---|
+| Filter value (statuses) | Returned label | Open/Closed | Meaning |
+|---|---|---|---|
 ${rows}
 
 ## Close codes (for Closed cases)

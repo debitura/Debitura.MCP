@@ -28,58 +28,77 @@ export const LIFECYCLE_VALUES = [
 export type LifecycleValue = (typeof LIFECYCLE_VALUES)[number];
 
 /**
- * Human-readable descriptions of each lifecycle stage, plus whether the case is
- * still open (Active) or finished (Closed) at that stage. Keyed by the exact
- * enum value the API emits, so the glossary stays in lock-step with the enum.
+ * Per-lifecycle-stage metadata. Keyed by the exact enum NAME — which is what
+ * `list_cases` accepts in its `statuses` filter and what the existing tool
+ * descriptions document.
+ *
+ * `label` is the human text the API actually RETURNS for that stage (the enum's
+ * `[Description]`, surfaced via `Lifecycle.GetDescription()`) — it can differ
+ * from the enum name (e.g. NeedsAdditionalDetails → "More Info Required"), so
+ * the glossary shows both: the name to filter by and the label you will see.
+ * `state` is whether the case is open (Active) or finished (Closed) at that
+ * stage. Mirrors `InvoicePartnerLifecycle` on the platform.
  */
 export const LIFECYCLE_DESCRIPTIONS: Record<
   LifecycleValue,
-  { state: "Active" | "Closed"; description: string }
+  { label: string; state: "Active" | "Closed"; description: string }
 > = {
   PendingContractSigning: {
+    label: "Pending contract signing",
     state: "Active",
     description:
       "Submitted, but a required contract (debt collection agreement / power of attorney) is still unsigned. Recovery cannot start until signing completes.",
   },
   PendingVerificationInternal: {
+    label: "Pending Verification Internal",
     state: "Active",
     description:
       "Awaiting Debitura's internal verification of the case data before it is routed to a partner.",
   },
   PendingVerification: {
+    label: "Pending Verification",
     state: "Active",
     description:
       "The assigned collection partner needs additional information or verification from the creditor before proceeding.",
   },
   NeedsAdditionalDetails: {
+    label: "More Info Required",
     state: "Active",
     description:
       "The case is missing details needed to proceed and is waiting on the creditor to supply them.",
   },
   Leads: {
+    label: "Collecting Quotes",
     state: "Active",
-    description: "An early-stage lead that has not yet been converted into an active case.",
+    description:
+      "An early-stage lead in the quoting phase — gathering quotes from the partner network, not yet an active case.",
   },
   LeadsQuoteGiven: {
+    label: "Pending Quote Selection",
     state: "Active",
-    description: "A lead for which a pricing quote has been provided but not yet accepted.",
+    description:
+      "A lead for which one or more pricing quotes have been provided but not yet accepted.",
   },
   Active: {
+    label: "Active",
     state: "Active",
     description:
       "Live recovery is underway — a collection partner in the debtor's country is actively pursuing the debt.",
   },
   Paused: {
+    label: "Paused",
     state: "Active",
     description:
       "Recovery is temporarily on hold (e.g. awaiting instruction or an external event) and can resume.",
   },
   Closed: {
+    label: "Closed",
     state: "Closed",
     description:
       "The case is finished. See the case's close code for the outcome (paid, partially paid, or written off / withdrawn).",
   },
   Merged: {
+    label: "Merged",
     state: "Closed",
     description: "Folded into another case; this record is retained for history only.",
   },
@@ -162,6 +181,11 @@ export const CLOSE_CODE_DESCRIPTIONS: { label: string; recovered: boolean; meani
     meaning: "The case was closed before collection began.",
   },
   {
+    label: "Case never started - Internal",
+    recovered: false,
+    meaning: "The case was closed before collection began (internal variant).",
+  },
+  {
     label: "Invalid Case Data",
     recovered: false,
     meaning: "Closed because the case data was invalid.",
@@ -181,22 +205,29 @@ export const CLOSE_CODE_DESCRIPTIONS: { label: string; recovered: boolean; meani
 /**
  * Numeric ChatRole → label. The single mapping behind both `chatRoleLabel`
  * (message projection) and the chat-role glossary resource.
+ *
+ * Mirrors the platform `ChatRole` enum exactly: 0=Partner, 1=Creditor,
+ * 2=ManagedByPartner. The Customer API sets `roleLabel` from the enum's
+ * `[Description]`, so `chatRoleLabel` uses that label when present and only
+ * falls back to this map when it is absent — keeping the numeric mapping in
+ * lock-step with the enum.
  */
 export const CHAT_ROLES: { value: number; label: string; description: string }[] = [
   {
     value: 0,
-    label: "Creditor",
-    description: "You — the creditor account that owns the API key (or your team members).",
-  },
-  {
-    value: 1,
     label: "Partner",
     description: "The local collection partner in the debtor's country handling the case.",
   },
   {
+    value: 1,
+    label: "Creditor",
+    description: "You — the creditor account that owns the API key (or your team members).",
+  },
+  {
     value: 2,
-    label: "System",
-    description: "An automated Debitura platform message (status updates, notifications).",
+    label: "Managed by partner",
+    description:
+      "A message made by the collection partner on behalf of the creditor (partner-managed account).",
   },
 ];
 
