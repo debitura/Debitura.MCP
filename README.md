@@ -157,6 +157,9 @@ it, also update **`server.json`** — its `version` field is independent and mus
 registry listing. (`smithery.yaml` has no version field; Smithery picks up the package version
 automatically.)
 
+When **adding or removing a tool**, also update the tool catalog above and the `tools/list`
+assertion in `scripts/e2e.ts` (it asserts the exact registered tool set).
+
 ## About Debitura
 
 Debitura is a global debt collection platform covering 190+ countries. Creditors submit overdue

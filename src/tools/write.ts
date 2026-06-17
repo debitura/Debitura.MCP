@@ -132,7 +132,7 @@ export function registerWriteTools(
       }
 
       // One key per confirmed create; reused across transient-failure retries so
-      // the API can replay the stored response instead of double-creating (DEB-4574).
+      // the API can replay the stored response instead of double-creating.
       const idempotencyKey = randomUUID();
       const body = {
         amountToRecover: input.amountToRecover,
