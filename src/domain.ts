@@ -86,41 +86,95 @@ export const LIFECYCLE_DESCRIPTIONS: Record<
 };
 
 /**
- * Close-code meanings for finished (Closed) cases. Only `Paid` (0) and
- * `PartiallyPaid` (9) represent money recovered; every other code is a
- * write-off / withdrawal outcome. Mirrors Invoice.CloseCode on the platform.
+ * Close-code meanings for finished (Closed) cases.
+ *
+ * The Customer API serializes `closeCode` as the human-readable DESCRIPTION
+ * STRING (via `InvoiceCloseCode.GetDescription()`), NOT an integer — so the
+ * `label` values below are exactly what the tools return on a closed case.
+ * `recovered: true` marks the only two outcomes that represent money collected
+ * (Paid + Partially paid); every other code is a write-off / withdrawal /
+ * never-started outcome. Do NOT count a Closed case as "collected" on the basis
+ * of lifecycle alone — check the close code.
+ *
+ * Mirrors `InvoiceCloseCode` on the platform; obsolete legacy codes (1–5) are
+ * intentionally omitted — current cases use the codes below.
  */
-export const CLOSE_CODE_DESCRIPTIONS: { code: number; name: string; meaning: string }[] = [
-  { code: 0, name: "Paid", meaning: "Recovered in full — the debt was collected." },
+export const CLOSE_CODE_DESCRIPTIONS: { label: string; recovered: boolean; meaning: string }[] = [
+  { label: "Paid", recovered: true, meaning: "Recovered in full — the debt was collected." },
   {
-    code: 9,
-    name: "PartiallyPaid",
+    label: "Partially paid",
+    recovered: true,
     meaning: "Part of the debt was recovered; the remainder was not collected.",
   },
   {
-    code: 1,
-    name: "WrittenOff",
-    meaning: "Closed without recovery — written off (e.g. uneconomical to pursue).",
-  },
-  {
-    code: 2,
-    name: "Bankrupt",
+    label: "Debtor Insolvent/Bankrupt",
+    recovered: false,
     meaning: "Closed because the debtor is insolvent / bankrupt — not recovered.",
   },
   {
-    code: 3,
-    name: "Untraceable",
+    label: "Debtor Untraceable",
+    recovered: false,
     meaning: "Closed because the debtor could not be located — not recovered.",
   },
   {
-    code: 4,
-    name: "Withdrawn",
+    label: "Disputed – Legal Action Declined by Client",
+    recovered: false,
+    meaning: "Claim was disputed and the client declined to pursue legal action — not recovered.",
+  },
+  {
+    label: "Withdrawn by Client",
+    recovered: false,
     meaning: "Withdrawn by the creditor before recovery completed.",
   },
   {
-    code: 5,
-    name: "Disputed",
-    meaning: "Closed as disputed — the claim was contested and not collected.",
+    label: "Pre-Legal Exhausted – No Payment",
+    recovered: false,
+    meaning: "Pre-legal collection was exhausted without payment.",
+  },
+  {
+    label: "Statute of Limitations Expired",
+    recovered: false,
+    meaning: "The claim is time-barred — not recoverable.",
+  },
+  {
+    label: "Settlement Rejected by Client",
+    recovered: false,
+    meaning: "A settlement was available but the client rejected it — closed without recovery.",
+  },
+  {
+    label: "Unresponsive Client",
+    recovered: false,
+    meaning: "Closed because the client did not respond when input was needed.",
+  },
+  {
+    label: "Uneconomical to Pursue",
+    recovered: false,
+    meaning: "Closed because further recovery effort was not economically worthwhile.",
+  },
+  {
+    label: "Other",
+    recovered: false,
+    meaning: "Closed for a reason not covered by the other codes — not recovered.",
+  },
+  {
+    label: "Case never started",
+    recovered: false,
+    meaning: "The case was closed before collection began.",
+  },
+  {
+    label: "Invalid Case Data",
+    recovered: false,
+    meaning: "Closed because the case data was invalid.",
+  },
+  {
+    label: "No Quotes Received",
+    recovered: false,
+    meaning: "A lead expired without any quotes from the partner network.",
+  },
+  {
+    label: "Quotes Expired – Not Accepted",
+    recovered: false,
+    meaning: "A lead received quotes but none were accepted before expiry.",
   },
 ];
 

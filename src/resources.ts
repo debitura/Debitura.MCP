@@ -31,7 +31,7 @@ function caseLifecycleGlossary(): string {
   }).join("\n");
 
   const closeRows = CLOSE_CODE_DESCRIPTIONS.map(
-    (c) => `| ${c.code} | \`${c.name}\` | ${c.meaning} |`,
+    (c) => `| \`${c.label}\` | ${c.recovered ? "Yes" : "No"} | ${c.meaning} |`,
   ).join("\n");
 
   return `# Debitura case lifecycle & status glossary
@@ -47,11 +47,12 @@ ${rows}
 
 ## Close codes (for Closed cases)
 
-When a case is \`Closed\`, its close code records the outcome. Only **Paid** and
-**PartiallyPaid** represent money recovered; every other code is a write-off or
-withdrawal — do not count them as "collected".
+When a case is \`Closed\`, its \`closeCode\` records the outcome. The API returns
+\`closeCode\` as the text label shown below (not a number). Only **Paid** and
+**Partially paid** represent money recovered; every other code is a write-off,
+withdrawal, or never-started outcome — do NOT count those as "collected".
 
-| Code | Name | Meaning |
+| Close code (text) | Money recovered? | Meaning |
 |---|---|---|
 ${closeRows}
 `;
