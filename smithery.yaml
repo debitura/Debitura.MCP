@@ -1,0 +1,25 @@
+# Smithery configuration for the Debitura MCP server.
+# This server is hosted by Debitura and speaks the Streamable HTTP protocol on /mcp.
+# See https://smithery.ai/docs/build/session-config
+startCommand:
+  type: http
+  # The API key is supplied per session. The server reads it ONLY from the XApiKey
+  # header (it has no query-param fallback), so `x-to` maps the config value to that
+  # header — without this mapping Smithery would default to a query param and auth
+  # would fail. The key is the tenant boundary and is never stored server-side.
+  configSchema:
+    type: object
+    required:
+      - apiKey
+    properties:
+      apiKey:
+        type: string
+        title: Debitura API Key
+        description: >-
+          Your Debitura API key, sent on every request as the XApiKey header.
+          Create one at https://app.debitura.com/CreditorApiKey
+        x-to:
+          header: XApiKey
+    additionalProperties: false
+  exampleConfig:
+    apiKey: deb_live_example_key_0123456789
