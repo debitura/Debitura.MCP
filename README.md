@@ -1,5 +1,10 @@
 # Debitura MCP Server
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-1f6feb.svg)](./LICENSE)
+[![Model Context Protocol](https://img.shields.io/badge/MCP-Streamable_HTTP-000000.svg)](https://modelcontextprotocol.io)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Docs](https://img.shields.io/badge/Docs-docs.debitura.com-0b7285.svg)](https://docs.debitura.com)
+
 **The MCP server for cross-border debt collection.** Connect Claude, Cursor, VS Code, or any
 MCP-compatible agent to [Debitura](https://www.debitura.com) and manage international debt
 recovery from your AI assistant: check case status, read partner conversations, get pricing,
