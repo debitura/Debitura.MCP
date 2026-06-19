@@ -23,7 +23,7 @@ disclosure.
 
 In scope:
 
-- This MCP server (`Admino-SaaS/Debitura.MCP`) and the hosted endpoint `https://mcp.debitura.com/mcp`.
+- This MCP server (`debitura/Debitura.MCP`) and the hosted endpoint `https://mcp.debitura.com/mcp`.
 
 Please note:
 

@@ -4,7 +4,7 @@
   "description": "Cross-border debt collection over the Debitura Customer API: check case status, read partner conversations, get pricing, and submit collection cases handled by vetted local partners in 190+ countries.",
   "version": "0.1.0",
   "repository": {
-    "url": "https://github.com/Admino-SaaS/Debitura.MCP",
+    "url": "https://github.com/debitura/Debitura.MCP",
     "source": "github"
   },
   "websiteUrl": "https://www.debitura.com",
