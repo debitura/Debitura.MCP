@@ -16,6 +16,10 @@ import { SERVER_NAME, SERVER_VERSION } from "./config.js";
  * from what the live server actually registers. The placeholder API key is never
  * used to reach the Customer API: listing tools/resources/prompts returns only
  * static metadata and never invokes a tool handler.
+ *
+ * SECURITY: everything in this card is served unauthenticated and is publicly
+ * enumerable. Never put internal-only names, hostnames, or secrets in a tool,
+ * resource, or prompt title/description/inputSchema — it all ends up here.
  */
 export interface ServerCard {
   serverInfo: { name: string; version: string };
@@ -58,7 +62,7 @@ export async function buildServerCard(): Promise<ServerCard> {
       })),
     };
   } finally {
-    await client.close();
-    await server.close();
+    // allSettled so one close() throwing can't skip the other or mask the root cause.
+    await Promise.allSettled([client.close(), server.close()]);
   }
 }
