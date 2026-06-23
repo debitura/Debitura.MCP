@@ -2,6 +2,7 @@ import express from "express";
 import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildServer } from "./server.js";
+import { buildServerCard, type ServerCard } from "./server-card.js";
 import { PORT, SERVER_VERSION } from "./config.js";
 
 /**
@@ -27,6 +28,22 @@ app.use(express.json({ limit: "40mb" }));
 
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok", version: SERVER_VERSION });
+});
+
+// Static server card for directory scanners (Smithery et al.) that can't complete
+// an authenticated tools/list scan. Built once on first request and cached — it's
+// derived purely from the registered tool/resource/prompt set, so it never changes
+// at runtime. See src/server-card.ts.
+let cardPromise: Promise<ServerCard> | undefined;
+app.get("/.well-known/mcp/server-card.json", async (_req, res) => {
+  try {
+    cardPromise ??= buildServerCard();
+    res.json(await cardPromise);
+  } catch (err) {
+    cardPromise = undefined; // let the next request retry
+    console.error("Failed to build server card:", err);
+    res.status(500).json({ error: "Failed to build server card" });
+  }
 });
 
 app.post("/mcp", async (req: Request, res: Response) => {

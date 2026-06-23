@@ -8,12 +8,13 @@
 **The MCP server for cross-border debt collection.** Connect Claude, Cursor, VS Code, or any
 MCP-compatible agent to [Debitura](https://www.debitura.com) and manage international debt
 recovery from your AI assistant: check case status, read partner conversations, get pricing,
-and submit new collection cases — handled by vetted local collection partners in 190+ countries
+and submit new collection cases — handled by vetted local collection partners in 183 countries
 on a no-cure-no-pay basis.
 
 - **Endpoint:** `https://mcp.debitura.com/mcp` (streamable HTTP)
 - **Auth:** your Debitura API key in the `XApiKey` header (or `Authorization: Bearer <key>`)
 - **Get a key:** log in at [app.debitura.com](https://app.debitura.com) → [API key page](https://app.debitura.com/CreditorApiKey)
+- **Connector page:** [debitura.com/integration/mcp-server](https://www.debitura.com/integration/mcp-server)
 
 ## Tools
 
@@ -167,7 +168,7 @@ assertion in `scripts/e2e.ts` (it asserts the exact registered tool set).
 
 ## About Debitura
 
-Debitura is a global debt collection platform covering 190+ countries. Creditors submit overdue
+Debitura is a global debt collection platform covering 183 countries. Creditors submit overdue
 B2B and B2C claims; vetted local collection partners in the debtor's jurisdiction recover them,
 typically no-cure-no-pay. Learn more at [debitura.com](https://www.debitura.com) · API docs at
 [docs.debitura.com](https://docs.debitura.com).
