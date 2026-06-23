@@ -29,8 +29,8 @@ export async function buildServerCard(): Promise<ServerCard> {
   const server = buildServer("server-card-introspection");
   const client = new Client({ name: "debitura-mcp-server-card", version: SERVER_VERSION });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   try {
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
     const caps = client.getServerCapabilities();
     const { tools } = await client.listTools();
     const resources = caps?.resources ? (await client.listResources()).resources : [];
