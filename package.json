@@ -1,6 +1,6 @@
 {
   "name": "@debitura/mcp-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Debitura MCP server — cross-border debt collection over the Debitura Customer API. Hosted at https://mcp.debitura.com/mcp; not published to npm.",
   "license": "MIT",
