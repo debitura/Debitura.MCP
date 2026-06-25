@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildServer } from "./server.js";
 import { buildServerCard, type ServerCard } from "./server-card.js";
+import { isKeylessDiscoveryRequest, DISCOVERY_SENTINEL_KEY } from "./auth-gate.js";
 import { PORT, SERVER_VERSION } from "./config.js";
 
 /**
@@ -48,7 +49,10 @@ app.get("/.well-known/mcp/server-card.json", async (_req, res) => {
 
 app.post("/mcp", async (req: Request, res: Response) => {
   const apiKey = extractApiKey(req);
-  if (!apiKey) {
+  // Allow the unauthenticated discovery/handshake (initialize, tools/list, …) so
+  // external directories can health-check the endpoint anonymously. Everything
+  // else — notably tools/call — still requires a key.
+  if (!apiKey && !isKeylessDiscoveryRequest(req.body)) {
     res.status(401).json({
       jsonrpc: "2.0",
       error: {
@@ -62,7 +66,9 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 
   // Stateless mode: fresh server + transport per request, bound to this key.
-  const server = buildServer(apiKey);
+  // Keyless discovery requests get a sentinel key that never reaches the
+  // Customer API (no tool handler runs for discovery methods).
+  const server = buildServer(apiKey ?? DISCOVERY_SENTINEL_KEY);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     // Plain JSON responses instead of SSE: this server is stateless and sits
