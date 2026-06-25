@@ -22,6 +22,47 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
+/**
+ * MCP discovery/handshake methods that return only static metadata (server info,
+ * capabilities, tool/prompt/resource schemas) and never touch the Customer API.
+ * These are exempt from the API-key gate so external directories (Glama et al.)
+ * can health-check the `/mcp` handshake anonymously. Tool *execution*
+ * (`tools/call`) and every data-returning method stay gated. Tool schemas are
+ * already public via `/.well-known/mcp/server-card.json`, so nothing new leaks.
+ */
+const KEYLESS_METHODS = new Set([
+  "initialize",
+  "notifications/initialized",
+  "ping",
+  "tools/list",
+  "prompts/list",
+  "resources/list",
+  "resources/templates/list",
+]);
+
+/**
+ * A keyless request is allowed only if EVERY JSON-RPC message in the body is a
+ * discovery/handshake method. Batched arrays are required to be fully exempt —
+ * if any element is a non-exempt method, the whole request needs a key.
+ */
+function isKeylessDiscoveryRequest(body: unknown): boolean {
+  const isExempt = (msg: unknown): boolean =>
+    typeof msg === "object" &&
+    msg !== null &&
+    typeof (msg as { method?: unknown }).method === "string" &&
+    KEYLESS_METHODS.has((msg as { method: string }).method);
+  if (Array.isArray(body)) return body.length > 0 && body.every(isExempt);
+  return isExempt(body);
+}
+
+/**
+ * Sentinel key used to build a server for keyless discovery requests. It never
+ * reaches the Customer API: discovery methods only enumerate static schemas and
+ * never invoke a tool handler (the only place the key is used). Mirrors the
+ * placeholder key in src/server-card.ts.
+ */
+const DISCOVERY_SENTINEL_KEY = "discovery-no-auth";
+
 const app = express();
 // Base64 file uploads up to 25 MB → ~34 MB JSON payloads.
 app.use(express.json({ limit: "40mb" }));
@@ -48,7 +89,10 @@ app.get("/.well-known/mcp/server-card.json", async (_req, res) => {
 
 app.post("/mcp", async (req: Request, res: Response) => {
   const apiKey = extractApiKey(req);
-  if (!apiKey) {
+  // Allow the unauthenticated discovery/handshake (initialize, tools/list, …) so
+  // external directories can health-check the endpoint anonymously. Everything
+  // else — notably tools/call — still requires a key.
+  if (!apiKey && !isKeylessDiscoveryRequest(req.body)) {
     res.status(401).json({
       jsonrpc: "2.0",
       error: {
@@ -62,7 +106,9 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 
   // Stateless mode: fresh server + transport per request, bound to this key.
-  const server = buildServer(apiKey);
+  // Keyless discovery requests get a sentinel key that never reaches the
+  // Customer API (no tool handler runs for discovery methods).
+  const server = buildServer(apiKey ?? DISCOVERY_SENTINEL_KEY);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     // Plain JSON responses instead of SSE: this server is stateless and sits
