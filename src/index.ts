@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import express from "express";
 import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -29,6 +30,10 @@ function extractApiKey(req: Request): string | undefined {
  * can health-check the `/mcp` handshake anonymously. Tool *execution*
  * (`tools/call`) and every data-returning method stay gated. Tool schemas are
  * already public via `/.well-known/mcp/server-card.json`, so nothing new leaks.
+ *
+ * INVARIANT — only add a method here if it invokes NO tool/resource/prompt
+ * handler and makes NO upstream call. The API key only reaches the Customer API
+ * via such a handler; adding a fetching method here would leak the sentinel key.
  */
 const KEYLESS_METHODS = new Set([
   "initialize",
@@ -45,7 +50,7 @@ const KEYLESS_METHODS = new Set([
  * discovery/handshake method. Batched arrays are required to be fully exempt —
  * if any element is a non-exempt method, the whole request needs a key.
  */
-function isKeylessDiscoveryRequest(body: unknown): boolean {
+export function isKeylessDiscoveryRequest(body: unknown): boolean {
   const isExempt = (msg: unknown): boolean =>
     typeof msg === "object" &&
     msg !== null &&
@@ -149,6 +154,10 @@ const methodNotAllowed = (_req: Request, res: Response) => {
 app.get("/mcp", methodNotAllowed);
 app.delete("/mcp", methodNotAllowed);
 
-app.listen(PORT, () => {
-  console.log(`Debitura MCP server listening on :${PORT} (POST /mcp)`);
-});
+// Only bind the port when run as the entrypoint (node dist/index.js), not when
+// imported — e.g. by unit tests that exercise the pure helpers above.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  app.listen(PORT, () => {
+    console.log(`Debitura MCP server listening on :${PORT} (POST /mcp)`);
+  });
+}
