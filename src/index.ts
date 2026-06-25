@@ -1,9 +1,9 @@
-import { pathToFileURL } from "node:url";
 import express from "express";
 import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildServer } from "./server.js";
 import { buildServerCard, type ServerCard } from "./server-card.js";
+import { isKeylessDiscoveryRequest, DISCOVERY_SENTINEL_KEY } from "./auth-gate.js";
 import { PORT, SERVER_VERSION } from "./config.js";
 
 /**
@@ -22,51 +22,6 @@ function extractApiKey(req: Request): string | undefined {
   }
   return undefined;
 }
-
-/**
- * MCP discovery/handshake methods that return only static metadata (server info,
- * capabilities, tool/prompt/resource schemas) and never touch the Customer API.
- * These are exempt from the API-key gate so external directories (Glama et al.)
- * can health-check the `/mcp` handshake anonymously. Tool *execution*
- * (`tools/call`) and every data-returning method stay gated. Tool schemas are
- * already public via `/.well-known/mcp/server-card.json`, so nothing new leaks.
- *
- * INVARIANT — only add a method here if it invokes NO tool/resource/prompt
- * handler and makes NO upstream call. The API key only reaches the Customer API
- * via such a handler; adding a fetching method here would leak the sentinel key.
- */
-const KEYLESS_METHODS = new Set([
-  "initialize",
-  "notifications/initialized",
-  "ping",
-  "tools/list",
-  "prompts/list",
-  "resources/list",
-  "resources/templates/list",
-]);
-
-/**
- * A keyless request is allowed only if EVERY JSON-RPC message in the body is a
- * discovery/handshake method. Batched arrays are required to be fully exempt —
- * if any element is a non-exempt method, the whole request needs a key.
- */
-export function isKeylessDiscoveryRequest(body: unknown): boolean {
-  const isExempt = (msg: unknown): boolean =>
-    typeof msg === "object" &&
-    msg !== null &&
-    typeof (msg as { method?: unknown }).method === "string" &&
-    KEYLESS_METHODS.has((msg as { method: string }).method);
-  if (Array.isArray(body)) return body.length > 0 && body.every(isExempt);
-  return isExempt(body);
-}
-
-/**
- * Sentinel key used to build a server for keyless discovery requests. It never
- * reaches the Customer API: discovery methods only enumerate static schemas and
- * never invoke a tool handler (the only place the key is used). Mirrors the
- * placeholder key in src/server-card.ts.
- */
-const DISCOVERY_SENTINEL_KEY = "discovery-no-auth";
 
 const app = express();
 // Base64 file uploads up to 25 MB → ~34 MB JSON payloads.
@@ -154,10 +109,6 @@ const methodNotAllowed = (_req: Request, res: Response) => {
 app.get("/mcp", methodNotAllowed);
 app.delete("/mcp", methodNotAllowed);
 
-// Only bind the port when run as the entrypoint (node dist/index.js), not when
-// imported — e.g. by unit tests that exercise the pure helpers above.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  app.listen(PORT, () => {
-    console.log(`Debitura MCP server listening on :${PORT} (POST /mcp)`);
-  });
-}
+app.listen(PORT, () => {
+  console.log(`Debitura MCP server listening on :${PORT} (POST /mcp)`);
+});

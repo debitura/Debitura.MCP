@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isKeylessDiscoveryRequest } from "./index.js";
+import { isKeylessDiscoveryRequest } from "./auth-gate.js";
 
 /**
  * Locks the API-key gate's exempt-method contract (DEB-4904). A keyless request
