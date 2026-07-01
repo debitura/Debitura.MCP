@@ -5,10 +5,17 @@
     "description": "Welcome to the Debitura Customer API, your gateway to seamlessly integrating your debt collection workflow with our platform. Debitura connects customers with trusted debt collection firms specializing in pre-legal debt recovery. With this API, you can easily upload cases, track their status, and manage your debt collection process efficiently. For any support or inquiries, please reach out to us at contact@debitura.com. To setup an API key, log into your Debitura account and go here: https://app.debitura.com/CreditorApiKey\n\n📖 Full documentation, guides, and integration walkthroughs: https://docs.debitura.com/clients\n\nNOTE: if you're representing a platform and want to provide this feature for your customers, you need a different API. Please contact us.",
     "contact": {
       "name": "Debitura Support",
+      "url": "https://www.debitura.com/integration/debt-collection-api",
       "email": "contact@debitura.com"
     },
     "version": "v1"
   },
+  "servers": [
+    {
+      "url": "https://customer-api.debitura.com",
+      "description": "Production"
+    }
+  ],
   "paths": {
     "/cases": {
       "post": {
@@ -3159,7 +3166,7 @@
           "TestWebhooks"
         ],
         "summary": "Fire a named webhook event type for a test case.",
-        "description": "Fires a real current-state webhook event for any registered Customer API event type against a test case — even if the case hasn't naturally reached the state that would produce that event.\n\n**Purpose:**\nUnblocks testing webhook handlers for rare or hard-to-reach event types (e.g. `case.closed`, `chat.created`) without having to drive the case through its full lifecycle.\n\n**Payload:**\nThe event carries the real current state of the case — fields are read from the case as it exists now. No payload fabrication or override is supported in this version.\n\n**Event types:**\n- `case.created` — current lifecycle (use after case creation, or to re-test your handler)\n- `case.updated` — current lifecycle (oldLifecycle and newLifecycle both reflect current state)\n- `case.closed` — current close code and comment (use after case is already closed, or to test your handler regardless)\n- `payment.created` — most recent payment on the case (returns 422 if no payments exist)\n- `chat.created` — most recent chat message on the case (returns 422 if no chats exist)\n\n**Target subscriptions:**\n- If `subscriptionId` is provided, fires only to that subscription. Returns 400 if the subscription is not found, not a test subscription, or not owned by this creditor.\n- If omitted, fires to all active test subscriptions registered for the given event type.\n\n**Event log (asynchronous):**\nThe synthetic fire is enqueued into the normal delivery pipeline, exactly like a real dispatch. A successful response (and its `enqueuedCount`) confirms the event was queued — it does **not** mean a row already exists in the webhook event log. The `WebhookEvent` row appears in `GET /webhooks/events` only after the worker drains the queue and attempts delivery — usually within a few seconds, but allow up to ~30 seconds, as the queue drain can lag under load. Do not assume the row is present the instant this call returns: poll `GET /webhooks/events?caseId={id}` with a short backoff until the event appears (or a ~30s timeout elapses) rather than reading it once immediately.\n\n**Guards:**\n- Returns 400 if the case is not a test case (`classification != test`), the event type is not valid, or the subscription is not found/not owned.\n- Returns 404 if the case is not found or not owned by this creditor.\n- Returns 422 if required data is missing (e.g. no payments for `payment.created`, no chats for `chat.created`).",
+        "description": "Fires a real current-state webhook event for any registered Customer API event type against a test case — even if the case hasn't naturally reached the state that would produce that event.\n\n**Purpose:**\nUnblocks testing webhook handlers for rare or hard-to-reach event types (e.g. `case.closed`, `chat.created`) without having to drive the case through its full lifecycle.\n\n**Payload:**\nThe event carries the real current state of the case — fields are read from the case as it exists now. No payload fabrication or override is supported in this version.\n\n**Event types:**\n- `case.created` — current lifecycle (use after case creation, or to re-test your handler)\n- `case.updated` — current lifecycle (oldLifecycle and newLifecycle both reflect current state)\n- `case.closed` — current close code and comment (use after case is already closed, or to test your handler regardless)\n- `payment.created` — most recent payment on the case (returns 422 if no payments exist)\n- `payment.deleted` — most recently deleted payment on the case (returns 422 if no payments have been deleted)\n- `chat.created` — most recent chat message on the case (returns 422 if no chats exist)\n\n**Target subscriptions:**\n- If `subscriptionId` is provided, fires only to that subscription. Returns 400 if the subscription is not found, not a test subscription, or not owned by this creditor.\n- If omitted, fires to all active test subscriptions registered for the given event type.\n\n**Event log (asynchronous):**\nThe synthetic fire is enqueued into the normal delivery pipeline, exactly like a real dispatch. A successful response (and its `enqueuedCount`) confirms the event was queued — it does **not** mean a row already exists in the webhook event log. The `WebhookEvent` row appears in `GET /webhooks/events` only after the worker drains the queue and attempts delivery — usually within a few seconds, but allow up to ~30 seconds, as the queue drain can lag under load. Do not assume the row is present the instant this call returns: poll `GET /webhooks/events?caseId={id}` with a short backoff until the event appears (or a ~30s timeout elapses) rather than reading it once immediately.\n\n**Guards:**\n- Returns 400 if the case is not a test case (`classification != test`), the event type is not valid, or the subscription is not found/not owned.\n- Returns 404 if the case is not found or not owned by this creditor.\n- Returns 422 if required data is missing (e.g. no payments for `payment.created`, no chats for `chat.created`).",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -3441,7 +3448,7 @@
           "Webhooks"
         ],
         "summary": "Create a new webhook subscription.",
-        "description": "Creates a new webhook subscription for receiving real-time event notifications.\n\n**Available Events:**\n- `case.created` - New collection case created\n- `case.updated` - Case lifecycle changed (e.g., Active → Legal)\n- `case.closed` - Case closed\n- `payment.created` - Payment registered on case\n- `chat.created` - Chat message created on case\n\n**Validation Rules:**\n- URL must be HTTPS\n- events array must contain only valid event types\n- URL must be publicly reachable\n- Private IP addresses are blocked (SSRF protection)\n\n**Returns:**\n- Webhook subscription details\n- Secret key for HMAC-SHA256 signature verification (shown only once)\n\n**IMPORTANT**: Save the secret immediately - it cannot be retrieved later.\n\n**Webhook Payload Structure:**\nEvery webhook delivery will contain these headers:\n- X-Debitura-Signature: HMAC-SHA256 signature (format: t={timestamp},v1={signature})\n- X-Debitura-Timestamp: Unix timestamp of the event\n- X-Debitura-Event: Event type (e.g., 'case.created')\n\n**Signature Verification (HMAC-SHA256):**\n1. Extract timestamp (t) and signature (v1) from X-Debitura-Signature header\n2. Construct signed payload: {timestamp}.{json_body}\n3. Compute HMAC-SHA256 using your webhook secret (Base64 decoded)\n4. Compare computed signature with v1 value (use constant-time comparison)\n5. Verify timestamp is within 5 minutes to prevent replay attacks\n\n**Example Payload:**\n```json\n{\n  \"id\": \"evt_abc123\",\n  \"event\": \"case.created\",\n  \"timestamp\": \"2024-01-15T10:30:00Z\",\n  \"data\": {\n    \"caseId\": \"guid-here\",\n    \"reference\": \"Q8OAXF3W\",\n    \"creditorReference\": \"INV-001\",\n    \"status\": \"Active\",\n    \"amount\": 1000.00,\n    \"currency\": \"EUR\",\n    \"debtorName\": \"Debtor Company Ltd\"\n  }\n}\n```",
+        "description": "Creates a new webhook subscription for receiving real-time event notifications.\n\n**Available Events:**\n- `case.created` - New collection case created\n- `case.updated` - Case lifecycle changed (e.g., Active → Legal)\n- `case.closed` - Case closed\n- `payment.created` - Payment registered on case\n- `payment.deleted` - Payment reversed (deleted) on case\n- `chat.created` - Chat message created on case\n\n**Validation Rules:**\n- URL must be HTTPS\n- events array must contain only valid event types\n- URL must be publicly reachable\n- Private IP addresses are blocked (SSRF protection)\n\n**Returns:**\n- Webhook subscription details\n- Secret key for HMAC-SHA256 signature verification (shown only once)\n\n**IMPORTANT**: Save the secret immediately - it cannot be retrieved later.\n\n**Webhook Payload Structure:**\nEvery webhook delivery will contain these headers:\n- X-Debitura-Signature: HMAC-SHA256 signature (format: t={timestamp},v1={signature})\n- X-Debitura-Timestamp: Unix timestamp of the event\n- X-Debitura-Event: Event type (e.g., 'case.created')\n\n**Signature Verification (HMAC-SHA256):**\n1. Extract timestamp (t) and signature (v1) from X-Debitura-Signature header\n2. Construct signed payload: {timestamp}.{json_body}\n3. Compute HMAC-SHA256 using your webhook secret (Base64 decoded)\n4. Compare computed signature with v1 value (use constant-time comparison)\n5. Verify timestamp is within 5 minutes to prevent replay attacks\n\n**Example Payload:**\n```json\n{\n  \"id\": \"evt_abc123\",\n  \"event\": \"case.created\",\n  \"timestamp\": \"2024-01-15T10:30:00Z\",\n  \"data\": {\n    \"caseId\": \"guid-here\",\n    \"reference\": \"Q8OAXF3W\",\n    \"creditorReference\": \"INV-001\",\n    \"status\": \"Active\",\n    \"amount\": 1000.00,\n    \"currency\": \"EUR\",\n    \"debtorName\": \"Debtor Company Ltd\"\n  }\n}\n```",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -5255,12 +5262,12 @@
         "example": {
           "currencyCode": "EUR",
           "amountToRecover": 4000,
-          "date": "2026-01-17",
-          "dueDate": "2026-01-25",
+          "date": "2026-02-01",
+          "dueDate": "2026-02-09",
           "claimDescription": "Custom mobile app development services",
           "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
           "creditorReference": "INV‑2024‑00789",
-          "isTest": false,
+          "isTest": true,
           "debtor": {
             "type": "Company",
             "name": "Acme Corp",
@@ -5964,6 +5971,11 @@
             "type": "string",
             "nullable": true
           },
+          "purpose": {
+            "type": "string",
+            "description": "Why this lead exists: PhaseChange (legal/enforcement escalation that advances the case\nphase) or AdditionalService (in-phase add-on). Null for legacy leads created before the field existed.",
+            "nullable": true
+          },
           "dateCreated": {
             "type": "string",
             "format": "date-time"
@@ -6148,6 +6160,16 @@
           },
           "partnerWhyUsSection": {
             "type": "string",
+            "nullable": true
+          },
+          "phase": {
+            "type": "string",
+            "description": "The case phase this quote offers to work in (Pre-legal / Legal / Enforcement). Null = unspecified.",
+            "nullable": true
+          },
+          "offerNature": {
+            "type": "string",
+            "description": "Whether declining stops the case (Recommendation / Required). v1: display only. Null = unspecified.",
             "nullable": true
           },
           "currency": {
@@ -6926,7 +6948,11 @@
     },
     {
       "name": "Test Webhooks",
-      "description": "Fire synthetic webhook events against test cases without driving the case to the state that would naturally produce them. POST /test/webhooks/fire emits any event type (case.created, case.updated, case.closed, payment.created, chat.created) against a test case — useful for testing rare or hard-to-reach event handlers in isolation."
+      "description": "Fire synthetic webhook events against test cases without driving the case to the state that would naturally produce them. POST /test/webhooks/fire emits any event type (case.created, case.updated, case.closed, payment.created, payment.deleted, chat.created) against a test case — useful for testing rare or hard-to-reach event handlers in isolation."
     }
-  ]
+  ],
+  "externalDocs": {
+    "description": "Debitura developer documentation",
+    "url": "https://docs.debitura.com"
+  }
 }
