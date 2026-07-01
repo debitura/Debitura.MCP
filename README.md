@@ -29,8 +29,10 @@ on a no-cure-no-pay basis.
 | `get_case_messages`        | Read the chat with the collection partner                                              |
 | `get_case_payments`        | Money recovered on a case                                                              |
 | `get_case_contract_status` | Which contracts are signed / blocking a case                                           |
+| `get_case_tasks`           | Open tasks (action-items) for one case                                                 |
 | `list_case_files`          | List documents attached to a case, with time-limited download URLs                     |
 | `get_account_summary`      | Case counts per lifecycle stage — a quick portfolio overview                           |
+| `list_tasks`               | Every open task (action-item) across your account, with solutionUrl + resolving action |
 | `preview_case`             | Pricing + eligibility dry-run before submitting (nothing persisted)                    |
 | `list_team_members`        | Your team — used to attribute messages and assign case owners                          |
 
@@ -149,7 +151,7 @@ DEBITURA_TEST_API_KEY=<test key> MCP_URL=http://localhost:3000/mcp npx tsx scrip
 ### Regenerating API types
 
 Types and the HTTP client are generated from the Customer API's OpenAPI spec
-(`openapi/customer-api.json`) via `openapi-typescript` — the curated 14-tool layer on top is
+(`openapi/customer-api.json`) via `openapi-typescript` — the curated 16-tool layer on top is
 hand-written:
 
 ```bash

@@ -1906,6 +1906,115 @@
         }
       }
     },
+    "/cases/{id}/tasks": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "List tasks for a case",
+        "description": "Returns every open task (action-item) attached to this specific case. Same data as GET /tasks, scoped to one case — use this when you're already working a specific case and want just its outstanding tasks.\n\n**Note:** account-level tasks that aren't tied to a single case (e.g. SignContract, AssignBankAccount — these block your whole account, not one case) never appear here; call GET /tasks to see those.\n\n**Filtering:**\n- status (default: Open) — Open or Solved\n- type (repeatable, e.g. ?type=ReplyToChat) — restrict to specific task types\n\nNo pagination — a single case has few tasks.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "Open"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tasks returned",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID missing, or invalid status/type filter",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Case not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/contracts/debt-collection/status": {
       "get": {
         "tags": [
@@ -3001,6 +3110,95 @@
           },
           "404": {
             "description": "Payment not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "List your open tasks",
+        "description": "Returns a paginated, account-wide list of every task (action-item) your account currently has — across ALL cases, not just one. Use GET /cases/{id}/tasks instead to scope this to a single case.\n\n**What is a task?**\nA task is something the platform needs YOU to do before a case can proceed — e.g. reply to a chat message, sign a contract, or assign a bank account for payouts. Tasks auto-resolve when the underlying condition clears (for example, once you reply to the case's chat, the ReplyToChat task disappears on its own) — this is a live work queue, not an append-only log. Poll it, don't assume a task you've seen before is still open.\n\n**Every task has a solutionUrl** — an absolute link, identical to the one used inside the Creditor app itself, that a human can open to resolve the task in one click, no matter the task type.\n\n**Some tasks also have an `action`** — a machine-readable hint pointing at the exact existing API call that resolves the task directly, with no human required. Today that's the chat-driven cluster (ReplyToChat, ClientInputRequired, MoreInfoNeeded) — post a message via POST /cases/{caseId}/chats and the task resolves itself once the case leaves its needs-info state. Tasks without an action are `action: null` — resolve those via solutionUrl.\n\n**Filtering:**\n- status (default: Open) — Open or Solved\n- type (repeatable, e.g. ?type=ReplyToChat&type=SignContract) — restrict to specific task types\n\n**Pagination:**\n- Page (default: 1), PageSize (default: 10, max: 100)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "Open"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tasks returned",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status, type, or pagination parameters",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6307,6 +6505,122 @@
         },
         "additionalProperties": false
       },
+      "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskActionDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "description": "HTTP method to use, e.g. `\"POST\"`.",
+            "nullable": true
+          },
+          "path": {
+            "type": "string",
+            "description": "Path template for the resolving call, e.g. `\"/cases/{caseId}/chats\"`.\nRelative to the API's base URL.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A machine-readable hint pointing at the existing API call that resolves a task, e.g.\n`{ \"method\": \"POST\", \"path\": \"/cases/{caseId}/chats\" }` for a chat-driven task.\n            \nPath uses the same `{param}` placeholder style as this API's own\ndocumented routes — substitute in the real IDs before calling."
+      },
+      "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The task's unique ID.",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "description": "Stable string code for the task type (e.g. `\"ReplyToChat\"`). This is the public,\nadditive-safe contract — it does NOT track the internal integer enum used in storage.",
+            "nullable": true
+          },
+          "typeLabel": {
+            "type": "string",
+            "description": "Human-readable label for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Type (e.g. \"Reply to chat\").",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "Short task title, as shown in the Creditor app.",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional longer description of what the task requires.",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Either `\"Open\"` or `\"Solved\"`.",
+            "nullable": true
+          },
+          "caseId": {
+            "type": "string",
+            "description": "The case (collection case / invoice) this task belongs to, when applicable.\nNull for account-level tasks not tied to a single case (e.g. SignContract, AssignBankAccount).",
+            "format": "uuid",
+            "nullable": true
+          },
+          "caseReference": {
+            "type": "string",
+            "description": "Your reference for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.CaseId, if any.",
+            "nullable": true
+          },
+          "leadId": {
+            "type": "string",
+            "description": "The lead this task belongs to (e.g. SelectQuoteWinner), if applicable.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "deadline": {
+            "type": "string",
+            "description": "When this task is due, if a deadline is set.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dateCreated": {
+            "type": "string",
+            "description": "When the task was created.",
+            "format": "date-time"
+          },
+          "dateSolved": {
+            "type": "string",
+            "description": "When the task was resolved, if it has been.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "solutionUrl": {
+            "type": "string",
+            "description": "Absolute URL — identical to the one the Creditor app itself links to — where a human can\nresolve this task. Always present, regardless of whether Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action is populated.",
+            "nullable": true
+          },
+          "action": {
+            "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskActionDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A creditor-facing action item (\"task\") — something the platform needs the client to do\nbefore a case can proceed (e.g. reply to a chat, sign a contract, assign a bank account).\n            \nEvery task carries a Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.SolutionUrl — an absolute link identical to the one used\ninside the Creditor app — so a human can resolve any task in one click, even task types that\nare not yet directly API-actionable. Tasks that ARE directly API-actionable additionally carry\na non-null Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action pointing at the exact API call that resolves them."
+      },
+      "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto": {
+        "required": [
+          "page"
+        ],
+        "type": "object",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/Debitura.Domain.Model.Base.PageData"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paged list of tasks, returned by `GET /tasks`."
+      },
       "Debitura.Web.ExternalApi.Contracts.V1.Users.CollectionPartnerUserDto": {
         "type": "object",
         "properties": {
@@ -6921,6 +7235,10 @@
     {
       "name": "Payments",
       "description": "Payments"
+    },
+    {
+      "name": "Tasks",
+      "description": "Tasks"
     },
     {
       "name": "TestCases",
