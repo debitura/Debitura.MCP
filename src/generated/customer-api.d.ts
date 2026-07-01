@@ -2672,6 +2672,7 @@ export interface paths {
          *     - `case.updated` — current lifecycle (oldLifecycle and newLifecycle both reflect current state)
          *     - `case.closed` — current close code and comment (use after case is already closed, or to test your handler regardless)
          *     - `payment.created` — most recent payment on the case (returns 422 if no payments exist)
+         *     - `payment.deleted` — most recently deleted payment on the case (returns 422 if no payments have been deleted)
          *     - `chat.created` — most recent chat message on the case (returns 422 if no chats exist)
          *
          *     **Target subscriptions:**
@@ -3007,6 +3008,7 @@ export interface paths {
          *     - `case.updated` - Case lifecycle changed (e.g., Active → Legal)
          *     - `case.closed` - Case closed
          *     - `payment.created` - Payment registered on case
+         *     - `payment.deleted` - Payment reversed (deleted) on case
          *     - `chat.created` - Chat message created on case
          *
          *     **Validation Rules:**
@@ -4145,12 +4147,12 @@ export interface components {
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-01-17",
-         *       "dueDate": "2026-01-25",
+         *       "date": "2026-02-01",
+         *       "dueDate": "2026-02-09",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
-         *       "isTest": false,
+         *       "isTest": true,
          *       "debtor": {
          *         "type": "Company",
          *         "name": "Acme Corp",
@@ -4710,6 +4712,11 @@ export interface components {
             /** Format: int32 */
             currentQuotesCount?: number;
             outcome?: string | null;
+            /**
+             * @description Why this lead exists: PhaseChange (legal/enforcement escalation that advances the case
+             *     phase) or AdditionalService (in-phase add-on). Null for legacy leads created before the field existed.
+             */
+            purpose?: string | null;
             /** Format: date-time */
             dateCreated?: string;
             /** Format: date-time */
@@ -4772,6 +4779,10 @@ export interface components {
             hybridEstimate?: number | null;
             proposedSolution?: string | null;
             partnerWhyUsSection?: string | null;
+            /** @description The case phase this quote offers to work in (Pre-legal / Legal / Enforcement). Null = unspecified. */
+            phase?: string | null;
+            /** @description Whether declining stops the case (Recommendation / Required). v1: display only. Null = unspecified. */
+            offerNature?: string | null;
             currency: string | null;
             /** Format: date-time */
             dateCreated?: string;
