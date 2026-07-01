@@ -4,6 +4,8 @@ import type { CustomerApiClient } from "../client.js";
 import { jsonResult, textResult, apiErrorResult } from "./results.js";
 import {
   LIFECYCLE_VALUES,
+  TASK_TYPE_VALUES,
+  TASK_STATUS_VALUES,
   chatRoleLabel,
   toUtcIso,
   sasExpiry,
@@ -508,6 +510,91 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         summary[lifecycle] = count as number;
       }
       return jsonResult(summary);
+    },
+  );
+
+  const taskInputFields = {
+    status: z
+      .enum(TASK_STATUS_VALUES)
+      .optional()
+      .describe('Filter by task status. "Open" (default) or "Solved".'),
+    type: z
+      .array(z.enum(TASK_TYPE_VALUES))
+      .optional()
+      .describe(
+        'Restrict to specific task types, e.g. ["ReplyToChat", "SignContract"]. ' +
+          "Valid values: " +
+          TASK_TYPE_VALUES.join(", "),
+      ),
+  };
+
+  server.registerTool(
+    "list_tasks",
+    {
+      title: "List Tasks",
+      description:
+        "List every open task (action-item) across your whole account — things the platform needs " +
+        "you to do before a case (or your account) can proceed: reply to a chat, sign a contract, " +
+        "assign a bank account, and so on. Use get_case_tasks instead to scope this to one case.\n\n" +
+        "Tasks auto-resolve once the underlying condition clears — e.g. replying to a case's chat makes " +
+        "its ReplyToChat task disappear on its own. Treat this as a live work queue, not a log: a task " +
+        "seen on one call may no longer be open on the next.\n\n" +
+        "Every task carries a solutionUrl — an absolute link a human can open to resolve it in one " +
+        "click, whatever the type. Some types (today: ReplyToChat, ClientInputRequired, MoreInfoNeeded) " +
+        "additionally carry a non-null `action` pointing at the exact API call that resolves them — " +
+        "for those, call send_case_message with the task's caseId instead of sending a human to " +
+        "solutionUrl. Tasks without an action rely on solutionUrl alone.\n\n" +
+        `Task types: ${TASK_TYPE_VALUES.join(", ")}.`,
+      inputSchema: {
+        ...taskInputFields,
+        page: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("Page number, starting from 1 (default 1)"),
+        pageSize: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Results per page (default 10, max 100)"),
+      },
+      annotations: { title: "List Tasks", ...READ_ANNOTATIONS },
+    },
+    async ({ status, type, page, pageSize }) => {
+      const { data, error, response } = await api.GET("/tasks", {
+        params: { query: { status, type, Page: page, PageSize: pageSize } },
+      });
+      if (!data) return apiErrorResult(response.status, error);
+      return jsonResult(normalizeTimestamps(data));
+    },
+  );
+
+  server.registerTool(
+    "get_case_tasks",
+    {
+      title: "Get Case Tasks",
+      description:
+        "List the open tasks (action-items) attached to one specific case — same data as list_tasks, " +
+        "scoped to a single case. Use this when you're already working a specific case and want just " +
+        "its outstanding tasks.\n\n" +
+        "Note: account-level tasks that aren't tied to any one case (e.g. SignContract, AssignBankAccount " +
+        "— these block the whole account, not one case) never appear here; use list_tasks to see those.\n\n" +
+        "See list_tasks for the full task model (auto-resolve, solutionUrl, action).",
+      inputSchema: {
+        caseId: z.string().uuid().describe("Debitura case ID (GUID)"),
+        ...taskInputFields,
+      },
+      annotations: { title: "Get Case Tasks", ...READ_ANNOTATIONS },
+    },
+    async ({ caseId, status, type }) => {
+      const { data, error, response } = await api.GET("/cases/{id}/tasks", {
+        params: { path: { id: caseId }, query: { status, type } },
+      });
+      if (!data) return apiErrorResult(response.status, error);
+      return jsonResult(normalizeTimestamps(data));
     },
   );
 }

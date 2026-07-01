@@ -63,8 +63,10 @@ async function main() {
     "get_case_contract_status",
     "get_case_messages",
     "get_case_payments",
+    "get_case_tasks",
     "list_case_files",
     "list_cases",
+    "list_tasks",
     "list_team_members",
     "ping",
     "preview_case",
@@ -72,7 +74,7 @@ async function main() {
     "upload_case_file",
   ];
   check(
-    "tools/list returns the 14 curated tools",
+    "tools/list returns the 16 curated tools",
     JSON.stringify(names) === JSON.stringify(expected),
     names.join(","),
   );
@@ -132,6 +134,10 @@ async function main() {
   // list_cases
   const list = await call(client, "list_cases", { page: 1, pageSize: 5 });
   check("list_cases", !list.isError, list.isError ? list.text.slice(0, 200) : undefined);
+
+  // list_tasks
+  const tasks = await call(client, "list_tasks", { page: 1, pageSize: 5 });
+  check("list_tasks", !tasks.isError, tasks.isError ? tasks.text.slice(0, 200) : undefined);
 
   // preview_case
   const preview = await call(client, "preview_case", {
@@ -199,6 +205,13 @@ async function main() {
 
     const contract = await call(client, "get_case_contract_status", { caseId });
     check("get_case_contract_status", !contract.isError);
+
+    const caseTasks = await call(client, "get_case_tasks", { caseId });
+    check(
+      "get_case_tasks",
+      !caseTasks.isError,
+      caseTasks.isError ? caseTasks.text.slice(0, 200) : undefined,
+    );
 
     const upload = await call(client, "upload_case_file", {
       caseId,

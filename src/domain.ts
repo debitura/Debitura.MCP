@@ -243,6 +243,28 @@ export function chatRoleLabel(
   return CHAT_ROLE_BY_VALUE.get(role) ?? "Unknown";
 }
 
+/**
+ * Creditor-facing task types exposed by GET /tasks and GET /cases/{id}/tasks
+ * (Debitura.Web.ExternalApi.Contracts.V1.Tasks). Mirrors the API's
+ * `AccessLevel=Creditor` allow-list — keep in lock-step if that list changes.
+ */
+export const TASK_TYPE_VALUES = [
+  "Generic",
+  "ReplyToChat",
+  "SelectQuoteWinner",
+  "ReviewPartner",
+  "ClientInputRequired",
+  "SignContract",
+  "MoreInfoNeeded",
+  "AssignBankAccount",
+  "CaseValidationNeedsInfo",
+] as const;
+
+export type TaskTypeValue = (typeof TASK_TYPE_VALUES)[number];
+
+/** Valid values for the `status` filter on both task endpoints. */
+export const TASK_STATUS_VALUES = ["Open", "Solved"] as const;
+
 // ---------------------------------------------------------------------------
 // Timestamp normalization (DEB-4702 C)
 // ---------------------------------------------------------------------------
