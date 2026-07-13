@@ -1,0 +1,14 @@
+{
+  "name": "@debitura/mcp-server-devtools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Isolated toolchain for lint + OpenAPI codegen — pinned to a TypeScript version these tools actually support, decoupled from the root project's TypeScript (see devtools/README.md).",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}
