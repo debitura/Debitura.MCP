@@ -61,14 +61,41 @@ registry. The source is published so you can audit it and, if you wish, run your
 ### Claude (web / desktop)
 
 Settings → Connectors → **Add custom connector** → URL `https://mcp.debitura.com/mcp`.
-When asked for authentication, add your API key as the `XApiKey` header (or use the
-bearer-token field — both work).
+
+Anthropic is rolling out a **Request headers** option in that same dialog that lets you
+authenticate without OAuth — but it's a gated beta (Anthropic: "contact us for early
+access"), so most accounts won't see it yet. If you do see it, add header `x-api-key`
+with your Debitura API key as the value. If you don't, use Claude Code or the Claude
+Desktop config-file method below instead — both work today regardless of beta access.
 
 ### Claude Code
 
 ```bash
 claude mcp add --transport http debitura https://mcp.debitura.com/mcp --header "XApiKey: YOUR_API_KEY"
 ```
+
+### Claude Desktop (no beta access to Request headers)
+
+Bypass the Connectors UI entirely by editing `claude_desktop_config.json` directly — a
+separate mechanism from the web-synced Connectors UI, no OAuth involved — using the
+[`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge:
+
+```json
+{
+  "mcpServers": {
+    "debitura": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://mcp.debitura.com/mcp", "--header", "XApiKey:${DEBITURA_KEY}"],
+      "env": { "DEBITURA_KEY": "YOUR_API_KEY" }
+    }
+  }
+}
+```
+
+File location: macOS `~/Library/Application Support/Claude/claude_desktop_config.json`,
+Windows `%APPDATA%\Claude\claude_desktop_config.json`. Restart Claude Desktop after
+saving — the server appears under Settings → Connectors → Manage connectors, even
+though you never touched "Add custom connector".
 
 ### Cursor
 
