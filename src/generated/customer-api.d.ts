@@ -4076,6 +4076,22 @@ export interface components {
              */
             enqueuedCount?: number;
         };
+        /**
+         * @description Additive external-API read model. Per-bucket outstanding on the debt ledger, produced by
+         *     the payment allocation engine (bucket total minus Σ active stored allocations — never re-derived
+         *     from a model). Mirrors the internal
+         *     `Debitura.Domain.Model.Receiveables.InvoiceEconomics.EconomicalAllocationOutstanding` shape.
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceAllocationOutstandingDto": {
+            /** Format: double */
+            principal?: number;
+            /** Format: double */
+            interest?: number;
+            /** Format: double */
+            reminderFees?: number;
+            /** Format: double */
+            collectionFees?: number;
+        };
         /** @description V1 Invoice DTO for external partner APIs */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto": {
             /** Format: uuid */
@@ -4164,6 +4180,7 @@ export interface components {
             disputeStatus?: string | null;
             validation?: components["schemas"]["Debitura.Domain.Services.CaseValidation.CaseValidationLeanDto"];
             assignedUser?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.AssignedUserDto"];
+            allocationOutstanding?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceAllocationOutstandingDto"];
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceListDto": {
             page: components["schemas"]["Debitura.Domain.Model.Base.PageData"];
@@ -4294,8 +4311,8 @@ export interface components {
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-02-01",
-         *       "dueDate": "2026-02-09",
+         *       "date": "2026-02-22",
+         *       "dueDate": "2026-03-02",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
