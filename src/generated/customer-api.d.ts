@@ -112,6 +112,9 @@ export interface paths {
          *     - debtor.countryAlpha2 (ISO 3166-1 alpha-2) is always required
          *     - debtor.state is a free-text region description
          *     - For US debtors: debtor.stateAlpha2 (two-letter state code) is also required – debtor.state is ignored in that scenario
+         *     - Customer API submissions are limited to cases that match an exclusive pre-legal partner.
+         *       If no eligible partner matches, the API returns 422 and does not create a case. The
+         *       interactive portal's custom-quote/network-lead fallback is not available through this API.
          *
          *     **Optional Parameters:**
          *     - creditorDivisionId - Assign case to a specific division (for multi-division creditors)
@@ -3152,7 +3155,9 @@ export interface paths {
          *
          *     **Available Events:**
          *     - `case.created` - New collection case created
-         *     - `case.updated` - Case lifecycle changed (e.g., Active → Legal)
+         *     - `case.updated` - Case lifecycle changed (e.g., Active → Paused). Does not cover engagement phase
+         *       changes (Pre-legal/Legal/Enforcement) — poll `GET /cases/{id}` or `GET /cases/{id}/timeline` for
+         *       the current phase; there is no phase-change event today.
          *     - `case.closed` - Case closed
          *     - `payment.created` - Payment registered on case
          *     - `payment.deleted` - Payment reversed (deleted) on case
@@ -4129,6 +4134,24 @@ export interface components {
             dateCollectionStarted?: string | null;
             closeCode?: string | null;
             /**
+             * @description The current phase of the case's engagement: "Pre-legal", "Legal", or "Enforcement".
+             *     A different axis from Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.Lifecycle/Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.CloseCode — an Active case can be
+             *     in any of the three phases.
+             *
+             *     Null means "no active engagement" (e.g. lead / quoting / pre-contract-signing / unassigned, or
+             *     a data-consistency gap) — this is a distinct third state, NOT a synonym for Pre-legal. Most
+             *     cases legitimately read Pre-legal; phase only leaves Pre-legal on legal/enforcement quote flows.
+             *
+             *     Not guaranteed to be monotonic: an admin correction can move phase backwards (e.g. Legal back
+             *     to Pre-legal).
+             *
+             *     Persists after case closure — reflects the case's last-known engagement phase, not the current
+             *     Lifecycle. Note: this is a different field from a lead quote's own offered phase (the phase a
+             *     partner's quote proposes to work the case at, if this case ever went through a quote flow) —
+             *     this field is the case-level phase of its actual engagement, not a quote's terms.
+             */
+            currentEngagementPhase?: string | null;
+            /**
              * @description The type of claim for this case (e.g. "Unpaid Invoice", "Loan Repayment", "Breach of Contract").
              *     Null if not set.
              */
@@ -4311,8 +4334,8 @@ export interface components {
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-02-22",
-         *       "dueDate": "2026-03-02",
+         *       "date": "2026-03-08",
+         *       "dueDate": "2026-03-16",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
