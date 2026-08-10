@@ -3950,7 +3950,7 @@ export interface components {
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.DebtorDto": {
             /**
-             * @description Debtor type. Valid values: "Company" or "Person"
+             * @description Debtor type. Valid values: "Company" or "Private" (case-insensitive)
              * @example Company
              */
             type: string;
@@ -4334,8 +4334,8 @@ export interface components {
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-03-08",
-         *       "dueDate": "2026-03-16",
+         *       "date": "2026-03-10",
+         *       "dueDate": "2026-03-18",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
