@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CustomerApiClient } from "../client.js";
 import { jsonResult, textResult, apiErrorResult } from "./results.js";
+import { claimLinesSchema, validateClaimAmountAndAge } from "./claim-amount.js";
 import {
   LIFECYCLE_VALUES,
   TASK_TYPE_VALUES,
@@ -339,7 +340,27 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
         "partner, pricing (success fee), and any contracts that would need signing. Nothing is persisted. " +
         "ALWAYS call this before create_case and show the user the pricing and requirements.",
       inputSchema: {
-        amountToRecover: z.number().positive().describe("Total principal amount to recover"),
+        amountToRecover: z
+          .number()
+          .positive()
+          .optional()
+          .describe("Total principal amount. Omit when sending claimLines"),
+        amountToRecoverOver6Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 180 days overdue"),
+        amountToRecoverOver12Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 365 days overdue"),
+        amountToRecoverOver24Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 730 days overdue"),
+        claimLines: claimLinesSchema,
         currencyCode: z
           .string()
           .length(3)
@@ -364,12 +385,31 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
     },
     async ({
       amountToRecover,
+      amountToRecoverOver6Months,
+      amountToRecoverOver12Months,
+      amountToRecoverOver24Months,
+      claimLines,
       currencyCode,
       debtorType,
       debtorCountryAlpha2,
       debtorStateAlpha2,
       dueDate,
     }) => {
+      const amountAndAgeError = validateClaimAmountAndAge(
+        {
+          amountToRecover,
+          amountToRecoverOver6Months,
+          amountToRecoverOver12Months,
+          amountToRecoverOver24Months,
+          claimLines,
+          dueDate,
+        },
+        "preview",
+      );
+      if (amountAndAgeError) {
+        return { isError: true, content: [{ type: "text", text: amountAndAgeError }] };
+      }
+
       // Pre-validate US state requirement
       if (debtorCountryAlpha2.toUpperCase() === "US" && !debtorStateAlpha2) {
         return {
@@ -386,6 +426,10 @@ export function registerReadTools(server: McpServer, api: CustomerApiClient): vo
       const { data, error, response } = await api.POST("/cases/preview", {
         body: {
           amountToRecover,
+          amountToRecoverOver6Months,
+          amountToRecoverOver12Months,
+          amountToRecoverOver24Months,
+          claimLines,
           currencyCode,
           dueDate,
           debtor: {

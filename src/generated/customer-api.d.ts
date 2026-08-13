@@ -116,6 +116,33 @@ export interface paths {
          *       If no eligible partner matches, the API returns 422 and does not create a case. The
          *       interactive portal's custom-quote/network-lead fallback is not available through this API.
          *
+         *     **Claim Amount and Aging — three ways to send it:**
+         *     1. `amountToRecover` plus a single `dueDate`
+         *     2. `amountToRecover` plus the cumulative `amountToRecoverOver6/12/24Months` buckets
+         *     3. `claimLines[]` — send the unpaid invoices and let us do the arithmetic (recommended for multi-invoice claims)
+         *
+         *     ```
+         *     "claimLines": [
+         *       { "dueDate": "2024-01-15", "amount": 423.42, "reference": "INV-1001" },
+         *       { "dueDate": "2025-05-02", "amount": 700.87, "reference": "INV-1042" }
+         *     ]
+         *     ```
+         *
+         *     - `amount` is the **outstanding balance** on that invoice — what the debtor still owes on it, already
+         *       net of payments received and credit notes issued. It is not the invoice's original face value.
+         *       Leave fully settled invoices out; every amount must be greater than zero, with at most 2 decimals.
+         *     - We derive `amountToRecover` and all three age buckets from the lines, so send `claimLines`
+         *       **instead of** `amountToRecover` and the `amountToRecoverOver6/12/24Months` fields. Sending both is a 400.
+         *     - Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest
+         *       age profile on a part-paid claim, because the buckets are then computed on the same outstanding
+         *       balances the total is computed on.
+         *     - `claimLines` is a pricing input only. It is not stored and is not shown to the collecting partner —
+         *       include a per-invoice breakdown in `comments` if the partner needs to see one.
+         *     - Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.
+         *     - If you omit the case-level `dueDate`, it is set to the oldest due date across your lines — so in that
+         *       case `date` must not be later than the earliest `claimLines` due date, or the request is rejected with
+         *       a 400 on `date`. Send an explicit `dueDate` if you need a different case due date.
+         *
          *     **Optional Parameters:**
          *     - creditorDivisionId - Assign case to a specific division (for multi-division creditors)
          *     - collectionPartnerId - Override automatic partner assignment with a specific collection partner
@@ -239,6 +266,25 @@ export interface paths {
          *     - AmountToRecoverOver24Months - Portion over 24 months overdue
          *     (Both must be provided together if used)
          *     - AmountToRecoverOver6Months - Portion over 6 months overdue (optional, improves pricing tier accuracy at the 180-day threshold; requires Over12/Over24)
+         *
+         *     **Optional Fields (Claim Lines — recommended for multi-invoice claims):**
+         *     Instead of totalling the claim and computing the buckets yourself, send the unpaid invoices:
+         *
+         *     ```
+         *     "claimLines": [
+         *       { "dueDate": "2024-01-15", "amount": 423.42, "reference": "INV-1001" },
+         *       { "dueDate": "2025-05-02", "amount": 700.87, "reference": "INV-1042" }
+         *     ]
+         *     ```
+         *
+         *     - `amount` is the **outstanding balance** on that invoice, already net of payments and credit notes.
+         *     - We derive `amountToRecover` and all three age buckets from the lines and price on them, so send
+         *       `claimLines` **instead of** `amountToRecover`, the `amountToRecoverOver6/12/24Months` fields, and
+         *       `dueDate`. Combining any of those with `claimLines` is a 400.
+         *     - Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest
+         *       age profile on a part-paid claim.
+         *     - Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.
+         *     - The same ledger produces the same quote here and on POST /cases.
          *
          *     **Solution URLs Are Context-Aware:**
          *     - Bearer token (referral partner) → referral onboarding URLs
@@ -4331,11 +4377,41 @@ export interface components {
             amount?: number | null;
         };
         /**
+         * @description A single unpaid invoice belonging to the claim.
+         *     Claim lines are a pricing input only: they are used to derive the claim total and the
+         *     cumulative age buckets, and are then discarded. They are not stored and are never shown
+         *     to the collecting partner — put a per-invoice breakdown in Comments if the partner needs one.
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.Requests.ClaimLineDto": {
+            /**
+             * Format: date-time
+             * @description Payment deadline of this invoice. Provide date only without time component.
+             *     Must be on or after 2000-01-01 and must not be in the future.
+             * @example 2024-01-15
+             */
+            dueDate: string | null;
+            /**
+             * Format: double
+             * @description The outstanding balance on this invoice in the case currency — what the debtor still owes on it,
+             *     already net of any payments the debtor has made and net of any credit notes issued against it.
+             *     This is not the invoice's original face value.
+             *     Must be greater than zero with at most 2 decimal places; omit invoices that are fully settled.
+             * @example 423.42
+             */
+            amount: number;
+            /**
+             * @description Optional: your own invoice number for this line. Used only to make validation errors readable
+             *     and to reject the same invoice being sent twice. It is not stored and not shown to anyone.
+             * @example INV-1001
+             */
+            reference?: string | null;
+        };
+        /**
          * @example {
          *       "currencyCode": "EUR",
          *       "amountToRecover": 4000,
-         *       "date": "2026-03-10",
-         *       "dueDate": "2026-03-18",
+         *       "date": "2026-03-01",
+         *       "dueDate": "2026-03-09",
          *       "claimDescription": "Custom mobile app development services",
          *       "comments": "Outstanding invoice INV 2024 00789 for custom mobile app development delivered 15 Nov 2024; payment 60 days overdue despite two reminders.",
          *       "creditorReference": "INV‑2024‑00789",
@@ -4378,6 +4454,10 @@ export interface components {
              *     (AmountToRecoverOver12Months and AmountToRecoverOver24Months) to enable blended age-based pricing.
              *
              *     If age breakdown fields are omitted, age uplift will be calculated from the invoice due date (single-invoice pricing).
+             *
+             *     Required unless you send ClaimLines, in which case this must be omitted or 0 — the server
+             *     derives the total by summing the outstanding balance of every claim line. Sending both a
+             *     non-zero AmountToRecover and ClaimLines is rejected, because the two would disagree.
              */
             amountToRecover?: number;
             /**
@@ -4437,6 +4517,23 @@ export interface components {
              *     - Must be ≤ AmountToRecover
              */
             amountToRecoverOver24Months?: number | null;
+            /**
+             * @description OPTIONAL - the unpaid invoices making up this claim, one line per invoice, each carrying its
+             *     own outstanding balance and payment deadline.
+             *
+             *     When supplied, the server derives AmountToRecover and all three cumulative age buckets from
+             *     these lines, so send them instead of — never alongside — AmountToRecover and the
+             *     AmountToRecoverOver6/12/24Months fields. Supplying both is rejected with a 400.
+             *
+             *     Use this whenever the debtor has already part-paid the claim: the buckets are then computed
+             *     on the same outstanding balances the total is computed on, so the age profile stays honest.
+             *     Maximum 1000 lines. When DueDate is omitted on the case, it is derived as the oldest line
+             *     due date; an explicit DueDate is honoured.
+             *
+             *     Claim lines are a pricing input only — they are not stored and are never shown to the
+             *     collecting partner.
+             */
+            claimLines?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.Requests.ClaimLineDto"][] | null;
             /** @description This skips the 'Pending verification' for Debitura and puts case straight to partner */
             skipDebituraVerification?: boolean;
             /**
@@ -4558,8 +4655,12 @@ export interface components {
              *     (AmountToRecoverOver12Months and AmountToRecoverOver24Months) to enable blended age-based pricing.
              *
              *     If age breakdown fields are omitted, the preview will show base pricing without age surcharge calculation.
+             *
+             *     Required unless you send ClaimLines, in which case this must be omitted or 0 — the server
+             *     derives the total by summing the outstanding balance of every claim line. Sending both a
+             *     non-zero AmountToRecover and ClaimLines is rejected, because the two would disagree.
              */
-            amountToRecover: number;
+            amountToRecover?: number;
             /** @description ISO 4217 currency code for the amount (e.g., "DKK", "EUR", "USD") */
             currencyCode: string;
             debtor: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.Requests.PreviewDebtorDto"];
@@ -4621,8 +4722,22 @@ export interface components {
              */
             amountToRecoverOver24Months?: number | null;
             /**
+             * @description OPTIONAL - the unpaid invoices making up this claim, one line per invoice, each carrying its
+             *     own outstanding balance and payment deadline.
+             *
+             *     When supplied, the server derives AmountToRecover and all three cumulative age buckets from
+             *     these lines and prices on them, so send them instead of — never alongside — AmountToRecover,
+             *     the AmountToRecoverOver6/12/24Months fields, or DueDate. Supplying any of those together
+             *     with ClaimLines is rejected with a 400.
+             *
+             *     Use this whenever the debtor has already part-paid the claim: the buckets are then computed
+             *     on the same outstanding balances the total is computed on, so the age profile stays honest.
+             *     Maximum 1000 lines. Claim lines are a pricing input only and are never stored.
+             */
+            claimLines?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.Requests.ClaimLineDto"][] | null;
+            /**
              * Format: date-time
-             * @description Optional invoice due date. Mutually exclusive with age bucket fields.
+             * @description Optional invoice due date. Mutually exclusive with age bucket fields and with ClaimLines.
              *     If provided, Debitura computes the age surcharge internally — no need to calculate age buckets.
              *     Cannot be a future date.
              */
