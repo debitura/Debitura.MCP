@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CustomerApiClient } from "../client.js";
 import { API_BASE_URL, SERVER_VERSION } from "../config.js";
 import { jsonResult, apiErrorResult, isBusinessErrorResponse } from "./results.js";
+import { claimLinesSchema, validateClaimAmountAndAge } from "./claim-amount.js";
 
 const WRITE_ANNOTATIONS = {
   readOnlyHint: false,
@@ -49,7 +50,27 @@ export function registerWriteTools(
         "network failures without risk of duplicate cases. A 422 response is a business rejection — read its " +
         "payload (it may contain signing URLs for required contracts, or duplicate-reference details).",
       inputSchema: {
-        amountToRecover: z.number().positive().describe("Total principal amount to recover"),
+        amountToRecover: z
+          .number()
+          .positive()
+          .optional()
+          .describe("Total principal amount. Omit when sending claimLines"),
+        amountToRecoverOver6Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 180 days overdue"),
+        amountToRecoverOver12Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 365 days overdue"),
+        amountToRecoverOver24Months: z
+          .number()
+          .nonnegative()
+          .optional()
+          .describe("Cumulative principal more than 730 days overdue"),
+        claimLines: claimLinesSchema,
         currencyCode: z.string().length(3).describe('ISO 4217 currency code, e.g. "EUR"'),
         debtor: z
           .object({
@@ -77,8 +98,9 @@ export function registerWriteTools(
         date: z.string().describe("Invoice date (ISO 8601, e.g. 2026-03-01) — required by the API"),
         dueDate: z
           .string()
+          .optional()
           .describe(
-            "Invoice due date (ISO 8601, e.g. 2026-04-30). Required — Debitura computes the age of the debt from it, which affects pricing.",
+            "Case due date (ISO 8601). When omitted with claimLines, Debitura uses the oldest line due date.",
           ),
         claimDescription: z
           .string()
@@ -118,6 +140,11 @@ export function registerWriteTools(
       annotations: { title: "Create Collection Case", ...WRITE_ANNOTATIONS, idempotentHint: false },
     },
     async (input) => {
+      const amountAndAgeError = validateClaimAmountAndAge(input, "create");
+      if (amountAndAgeError) {
+        return { isError: true, content: [{ type: "text", text: amountAndAgeError }] };
+      }
+
       // Pre-validate US state requirement
       if (input.debtor.countryAlpha2.toUpperCase() === "US" && !input.debtor.stateAlpha2) {
         return {
@@ -136,6 +163,10 @@ export function registerWriteTools(
       const idempotencyKey = randomUUID();
       const body = {
         amountToRecover: input.amountToRecover,
+        amountToRecoverOver6Months: input.amountToRecoverOver6Months,
+        amountToRecoverOver12Months: input.amountToRecoverOver12Months,
+        amountToRecoverOver24Months: input.amountToRecoverOver24Months,
+        claimLines: input.claimLines,
         currencyCode: input.currencyCode,
         debtor: input.debtor,
         date: input.date,
