@@ -1508,7 +1508,9 @@ export interface paths {
          * List tasks for a case
          * @description Returns every open task (action-item) attached to this specific case. Same data as GET /tasks, scoped to one case — use this when you're already working a specific case and want just its outstanding tasks.
          *
-         *     **Note:** account-level tasks that aren't tied to a single case (e.g. SignContract, AssignBankAccount — these block your whole account, not one case) never appear here; call GET /tasks to see those.
+         *     **Note:** account-level tasks that aren't tied to a single case (e.g. SignContract, AssignBankAccount — these block your whole account, not one case) never appear here; call GET /tasks to see those. The same goes for lead-scoped tasks (e.g. SelectQuoteWinner), which are attached to a lead rather than a case.
+         *
+         *     **Note:** the quote-review tasks (IncumbentLegalQuotePending, ReviewQuotes) DO appear here — they are attached to the case — but they are decided on the lead behind it, so they normally carry a `leadId` and their solutionUrl points at that lead rather than this case. On the rare row with no lead recorded, `leadId` is null and solutionUrl falls back to this case's page.
          *
          *     **Filtering:**
          *     - status (default: Open) — Open or Solved
@@ -2541,6 +2543,8 @@ export interface paths {
          *     **Every task has a solutionUrl** — an absolute link, identical to the one used inside the Creditor app itself, that a human can open to resolve the task in one click, no matter the task type.
          *
          *     **Some tasks also have an `action`** — a machine-readable hint pointing at the exact existing API call that resolves the task directly, with no human required. Today that's the chat-driven cluster (ReplyToChat, ClientInputRequired, MoreInfoNeeded) — post a message via POST /cases/{caseId}/chats and the task resolves itself once the case leaves its needs-info state. Tasks without an action are `action: null` — resolve those via solutionUrl.
+         *
+         *     **Some tasks also carry a `leadId`** — the lead the task is decided on. The quote-review tasks both mean a quote is waiting on YOUR decision: IncumbentLegalQuotePending — the partner already on the case has sent a legal-offer quote for you to approve or decline; ReviewQuotes — one or more quotes have arrived on the case's lead and you must choose how to proceed. The two never appear together on the same lead. Both are attached to a case, so they return `caseId` AND `leadId`, and their solutionUrl points at the lead rather than the case. The older SelectQuoteWinner task also carries a `leadId`, but is attached to the lead itself — so it has no `caseId` and never appears under GET /cases/{id}/tasks.
          *
          *     **Filtering:**
          *     - status (default: Open) — Open or Solved
@@ -5184,7 +5188,12 @@ export interface components {
             caseReference?: string | null;
             /**
              * Format: uuid
-             * @description The lead this task belongs to (e.g. SelectQuoteWinner), if applicable.
+             * @description The lead this task belongs to, if any. Populated for lead-scoped tasks, and for the
+             *     quote-review tasks (`IncumbentLegalQuotePending`, `ReviewQuotes`) — which are
+             *     attached to a case but decided on the lead, so those carry both `caseId` and
+             *     `leadId`, and their `solutionUrl` points at the lead. Null for every other
+             *     task type. On the rare quote-review row with no lead recorded, `leadId` is null and
+             *     `solutionUrl` falls back to the case page — the two never disagree.
              */
             leadId?: string | null;
             /**
