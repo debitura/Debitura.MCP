@@ -159,7 +159,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
+                    /** @description Optional non-empty, non-whitespace idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `businessErrors[0].type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
                     "Idempotency-Key"?: string;
                 };
                 path?: never;
@@ -1987,7 +1987,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: {
-                    /** @description Optional idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `Type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
+                    /** @description Optional non-empty, non-whitespace idempotency key (max 255 characters) for safely retrying this request. If a previous request used the same key with an identical body, the original terminal response is replayed verbatim. Reusing the key with a different body returns 422 with `businessErrors[0].type: "IdempotencyConflict"`. Field-level 400 validation errors are not stored, so you may fix the request and retry with the same key. */
                     "Idempotency-Key"?: string;
                 };
                 path?: never;
@@ -3764,16 +3764,6 @@ export interface components {
             /** Format: int32 */
             readonly totalPages?: number;
         };
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        "Debitura.Domain.Model.CollectionPartnerLogics.CollectionPartners.SurveyCadenceMode": 0 | 1;
-        /**
-         * Format: int32
-         * @enum {integer}
-         */
-        "Debitura.Domain.Model.CommunicationCenter.Chats.ChatRole": 0 | 1 | 2;
         "Debitura.Domain.Model.Webhooks.Dtos.CreateWebhookRequest": {
             /** Format: uri */
             url: string;
@@ -3805,9 +3795,6 @@ export interface components {
         "Debitura.Domain.Services.CaseValidation.CaseValidationItemDto": {
             resolutionArea?: string | null;
             description?: string | null;
-        };
-        "Debitura.Domain.Services.CaseValidation.CaseValidationLeanDto": {
-            needsInfo?: boolean;
         };
         "Debitura.Domain.Services.CaseValidation.CaseValidationStatusDto": {
             needsInfo?: boolean;
@@ -3929,13 +3916,17 @@ export interface components {
              */
             currentEngagementPhase?: string | null;
         };
+        /** @description Stable v1 validation summary used by ordinary and list mappings. */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseValidationLeanDto": {
+            needsInfo?: boolean;
+        };
         /** @description V1 Collection Partner DTO for external partner APIs */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.CollectionPartnerDto": {
             name?: string | null;
             officeEmail?: string | null;
             officePhone?: string | null;
             publicSite?: string | null;
-            surveyCadenceMode?: components["schemas"]["Debitura.Domain.Model.CollectionPartnerLogics.CollectionPartners.SurveyCadenceMode"];
+            surveyCadenceMode?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.SurveyCadenceModeDto"];
         };
         /** @description Status of an individual contract (SDCA, PoA, or Pricing Appendix). */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.ContractItemDto": {
@@ -4251,12 +4242,12 @@ export interface components {
              *     Null when the dispute status has not been set on the case.
              */
             disputeStatus?: string | null;
-            validation?: components["schemas"]["Debitura.Domain.Services.CaseValidation.CaseValidationLeanDto"];
+            validation?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.CaseValidationLeanDto"];
             assignedUser?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.AssignedUserDto"];
             allocationOutstanding?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceAllocationOutstandingDto"];
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceListDto": {
-            page: components["schemas"]["Debitura.Domain.Model.Base.PageData"];
+            page: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.PageData"];
             cases?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto"][] | null;
         };
         /** @description Geographic jurisdiction information for the case. */
@@ -4833,6 +4824,12 @@ export interface components {
              */
             combinedSigningUrl?: string | null;
         };
+        /**
+         * Format: int32
+         * @description Stable v1 survey-generation cadence values. Serialized as their numeric values.
+         * @enum {integer}
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.SurveyCadenceModeDto": 0 | 1;
         /** @description Represents the actor (person or system) that performed a timeline action. */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto": {
             /** @description The type of actor. One of: "System", "Creditor user", "Partner user". */
@@ -4846,7 +4843,18 @@ export interface components {
             type: string | null;
             title: string | null;
             description: string | null;
+            /**
+             * @description Related cases that the authenticated timeline viewer may open. Merge timeline entries
+             *     use these safe references instead of exposing persisted case identifiers in text.
+             */
+            relatedCases?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineRelatedCaseDto"][] | null;
             actor?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto"];
+        };
+        /** @description A case reference scoped to the authenticated timeline viewer. */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineRelatedCaseDto": {
+            /** Format: uuid */
+            id?: string;
+            reference: string | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatDto": {
             /** Format: uuid */
@@ -4855,7 +4863,7 @@ export interface components {
             dateCreated?: string;
             /** Format: date-time */
             dateUpdated?: string | null;
-            role?: components["schemas"]["Debitura.Domain.Model.CommunicationCenter.Chats.ChatRole"];
+            role?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatRoleDto"];
             /**
              * @description Human-readable label for the role (e.g., "Partner", "Creditor", "Managed by partner").
              *     Companion to Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatDto.Role — always present when Role is set.
@@ -4865,6 +4873,12 @@ export interface components {
             isSeen?: boolean;
             user?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Users.UserRelationDto"];
         };
+        /**
+         * Format: int32
+         * @description Stable v1 sender-role values. Serialized as their numeric values.
+         * @enum {integer}
+         */
+        "Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatRoleDto": 0 | 1 | 2;
         /** @description Request to send a chat message on a case. */
         "Debitura.Web.ExternalApi.Contracts.V1.Chats.SendChatRequest": {
             /**
@@ -4927,7 +4941,7 @@ export interface components {
             updatedUtc?: string | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionListDto": {
-            page: components["schemas"]["Debitura.Domain.Model.Base.PageData"];
+            page: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.PageData"];
             divisions?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Divisions.DivisionDto"][] | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Divisions.UpdateDivisionRequestDto": {
@@ -5112,6 +5126,19 @@ export interface components {
             /** Format: double */
             costProcessMisc?: number;
         };
+        /** @description Stable v1 pagination metadata shared by public list responses. */
+        "Debitura.Web.ExternalApi.Contracts.V1.PageData": {
+            /** Format: int32 */
+            totalResults?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            currentPage?: number;
+            /** Format: int32 */
+            responseCount?: number;
+            /** Format: int32 */
+            readonly totalPages?: number;
+        };
         "Debitura.Web.ExternalApi.Contracts.V1.Payments.PaymentDto": {
             /** Format: uuid */
             id?: string;
@@ -5220,7 +5247,7 @@ export interface components {
         };
         /** @description Paged list of tasks, returned by `GET /tasks`. */
         "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto": {
-            page: components["schemas"]["Debitura.Domain.Model.Base.PageData"];
+            page: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.PageData"];
             tasks?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto"][] | null;
         };
         /**
@@ -5239,7 +5266,7 @@ export interface components {
             email?: string | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Users.UserListDto": {
-            page: components["schemas"]["Debitura.Domain.Model.Base.PageData"];
+            page: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.PageData"];
             users?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Users.CollectionPartnerUserDto"][] | null;
         };
         "Debitura.Web.ExternalApi.Contracts.V1.Users.UserRelationDto": {
