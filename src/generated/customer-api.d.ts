@@ -4292,9 +4292,37 @@ export interface components {
             isEligible?: boolean;
             /**
              * @description Explanation of why the case is not eligible (only present when IsEligible = false).
-             *     Common reasons: "We don't have an exclusive pre-legal partner in the provided jurisdiction."
+             *     Branch on Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReasonCode rather than on this text, which may be reworded.
              */
             ineligibilityReason?: string | null;
+            /**
+             * @description Stable machine-readable reason, present whenever Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReason is
+             *     One of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum,
+             *     DebtorTypeNotCovered, NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.
+             *
+             *     Only NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum
+             *     means the geography IS covered and only the claim amount fell short. EligibilityUndetermined
+             *     is a transient failure on our side, not a statement about coverage — retry rather than
+             *     telling the client their address is wrong.
+             */
+            ineligibilityReasonCode?: string | null;
+            /**
+             * Format: double
+             * @description The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the
+             *     request. Present on ELIGIBLE responses too, so the floor can be shown without a second call.
+             *     Null when no partner covering this case declares a minimum.
+             */
+            applicableMinimumAmount?: number | null;
+            /** @description ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.ApplicableMinimumAmount is expressed in. */
+            applicableMinimumCurrencyCode?: string | null;
+            /**
+             * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
+             *     amount-based part of this answer was NOT actually checked It can be true on an
+             *     eligible answer: a partner matched only because amount conditions failed open while rates were
+             *     down. Treat such an answer as provisional and retry rather than relying on the floor having
+             *     been applied.
+             */
+            amountCheckUnavailable?: boolean;
             partnerAssignment?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.PartnerAssignmentDto"];
             /**
              * @description List of actions required before the case can be submitted (e.g., sign contracts).
@@ -5311,8 +5339,38 @@ export interface components {
             jurisdiction?: components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.JurisdictionInfoApiDTO"];
             partner?: components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.PartnerInfoApiDTO"];
             powerOfAttorneyStatus?: components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.PowerOfAttorneyStatusApiDTO"];
-            /** @description Error message if IsEligible = false */
+            /**
+             * @description Error message if IsEligible = false.
+             *     Branch on Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.IneligibilityReasonCode rather than on this text, which may be reworded.
+             */
             errorMessage?: string | null;
+            /**
+             * @description Stable machine-readable reason, present whenever Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ErrorMessage is.
+             *     One of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum, DebtorTypeNotCovered,
+             *     NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.
+             *
+             *     Only NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum
+             *     means the geography IS covered and only the claim amount fell short. EligibilityUndetermined
+             *     is a transient failure on our side, not a statement about coverage.
+             */
+            ineligibilityReasonCode?: string | null;
+            /**
+             * Format: double
+             * @description The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the
+             *     request. Present on ELIGIBLE responses too, so the floor can be shown without a second call.
+             *     Null when no partner covering this case declares a minimum.
+             */
+            applicableMinimumAmount?: number | null;
+            /** @description ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ApplicableMinimumAmount is expressed in. */
+            applicableMinimumCurrencyCode?: string | null;
+            /**
+             * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
+             *     amount-based part of this answer was NOT actually checked It can be true on an
+             *     eligible answer: a partner matched only because amount conditions failed open while rates were
+             *     down. Treat such an answer as provisional and retry rather than relying on the floor having
+             *     been applied.
+             */
+            amountCheckUnavailable?: boolean;
         };
         "Debitura.Web.ExternalCustomerAPI.Models.Coverages.CollectionContractStatusApiDTO": {
             signed?: boolean;
