@@ -1079,7 +1079,7 @@
           "Cases"
         ],
         "summary": "Upload a file to a case",
-        "description": "Uploads a file and associates it with a case.\n\nFile requirements:\n- Maximum file size: 25MB\n- Allowed file types: PDF (.pdf), Excel (.xls, .xlsx), CSV (.csv), Text (.TXT), Images (.jpg, .jpeg, .png, .gif)\n\nThe file will be stored securely and associated with the specified case.\n\nDocument types:\n- OriginalInvoice (default) - The original invoice document\n- DebtorDocuments - Documents provided by the debtor\n- CreditorDocuments - Documents provided by the creditor\n- PartnerDocuments - Documents provided by collection partners\n- DemandLetter - Formal demand letter\n- Miscellaneous - Other supporting documents",
+        "description": "Uploads a file and associates it with a case.\n\nFile requirements:\n- Maximum file size: 25MB\n- Allowed file types: PDF (.pdf), Excel (.xls, .xlsx), CSV (.csv), Text (.TXT), Images (.jpg, .jpeg, .png, .gif)\n\nThe file will be stored securely and associated with the specified case.\n\nDocument type (optional, case-insensitive). Omit it when you do not know it; the file is then stored as not specified.\n- OriginalInvoice - Invoice or credit note\n- AccountStatement - Statement of account\n- Contract - Contract or agreement\n- TermsAndConditions - Terms and conditions\n- ProofOfDelivery - Order or proof of delivery\n- DemandLetter - Reminder or demand letter\n- Correspondence - Correspondence with the debtor\n- PaymentProof - Proof of payment\n- CourtDocument - Court or legal document\n- IdentityDocument - Identity document\n- Miscellaneous - Other\n\nStill accepted for existing integrations: DebtorDocuments, CreditorDocuments, PartnerDocuments.\nAny other value is rejected with 400 and error InvalidDocumentType.",
         "parameters": [
           {
             "name": "id",
@@ -5277,13 +5277,24 @@
           },
           "applicableMinimumAmount": {
             "type": "number",
-            "description": "The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the\nrequest. Present on ELIGIBLE responses too, so the floor can be shown without a second call.\nNull when no partner covering this case declares a minimum.",
+            "description": "What this claim would have to reach to be accepted, in the currency of the request; never below\nthe platform minimum of 100 USD. Only present when no partner was matched. Withheld when the\nclient's own routing exclusions mean the number would not be reachable for them, and when the\nrequest currency cannot be priced. Null when no partner covering this case declares a minimum.",
             "format": "double",
             "nullable": true
           },
           "applicableMinimumCurrencyCode": {
             "type": "string",
             "description": "ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.ApplicableMinimumAmount is expressed in.",
+            "nullable": true
+          },
+          "marketMinimumAmount": {
+            "type": "number",
+            "description": "The smallest claim the marketplace takes for this jurisdiction and debtor type, in the currency of\nthe request: the lowest partner floor, never below the platform minimum of 100 USD. A statement\nabout the market, not about this claim: it is returned whether or not a partner was selected, and\ndoes not depend on the claim amount or on the caller. It is not the admission rules applied when a\ncase is created. Null when no partner covers the market or the amount cannot be priced.",
+            "format": "double",
+            "nullable": true
+          },
+          "marketMinimumCurrencyCode": {
+            "type": "string",
+            "description": "ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.MarketMinimumAmount is expressed in.",
             "nullable": true
           },
           "amountCheckUnavailable": {
@@ -5733,8 +5744,9 @@
           1
         ],
         "type": "integer",
-        "description": "Stable v1 survey-generation cadence values. Serialized as their numeric values.",
-        "format": "int32"
+        "description": "Deprecated: kept as a number and never removed, but not extended. Survey-generation cadence: 0 = Standard\n(rolling monthly survey), 1 = DecisionPointOnly (no rolling surveys).",
+        "format": "int32",
+        "deprecated": true
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Cases.TimelineActorDto": {
         "required": [
@@ -5833,7 +5845,7 @@
           },
           "roleLabel": {
             "type": "string",
-            "description": "Human-readable label for the role (e.g., \"Partner\", \"Creditor\", \"Managed by partner\").\nCompanion to Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatDto.Role — always present when Role is set.",
+            "description": "The sender role, readable. Always one of \"Partner\", \"Creditor\" or \"Managed by partner\" — these\nvalues are stable.",
             "nullable": true
           },
           "message": {
@@ -5856,8 +5868,9 @@
           2
         ],
         "type": "integer",
-        "description": "Stable v1 sender-role values. Serialized as their numeric values.",
-        "format": "int32"
+        "description": "Deprecated: kept as a number and never removed, but not extended — read `roleLabel` instead.\nSender role: 0 = Partner, 1 = Creditor, 2 = ManagedByPartner.",
+        "format": "int32",
+        "deprecated": true
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Chats.SendChatRequest": {
         "required": [
@@ -6926,13 +6939,24 @@
           },
           "applicableMinimumAmount": {
             "type": "number",
-            "description": "The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the\nrequest. Present on ELIGIBLE responses too, so the floor can be shown without a second call.\nNull when no partner covering this case declares a minimum.",
+            "description": "What this claim would have to reach to be accepted, in the currency of the request; never below\nthe platform minimum of 100 USD. Only present when no partner was matched. Withheld when the\nclient's own routing exclusions mean the number would not be reachable for them, and when the\nrequest currency cannot be priced. Null when no partner covering this case declares a minimum.",
             "format": "double",
             "nullable": true
           },
           "applicableMinimumCurrencyCode": {
             "type": "string",
             "description": "ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ApplicableMinimumAmount is expressed in.",
+            "nullable": true
+          },
+          "marketMinimumAmount": {
+            "type": "number",
+            "description": "The smallest claim the marketplace takes for this jurisdiction and debtor type, in the currency of\nthe request: the lowest partner floor, never below the platform minimum of 100 USD. A statement\nabout the market, not about this claim: it is returned whether or not a partner was selected, and\ndoes not depend on the claim amount or on the caller. It is not the admission rules applied when a\ncase is created. Null when no partner covers the market or the amount cannot be priced.",
+            "format": "double",
+            "nullable": true
+          },
+          "marketMinimumCurrencyCode": {
+            "type": "string",
+            "description": "ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.MarketMinimumAmount is expressed in.",
             "nullable": true
           },
           "amountCheckUnavailable": {

@@ -986,13 +986,21 @@ export interface paths {
          *
          *     The file will be stored securely and associated with the specified case.
          *
-         *     Document types:
-         *     - OriginalInvoice (default) - The original invoice document
-         *     - DebtorDocuments - Documents provided by the debtor
-         *     - CreditorDocuments - Documents provided by the creditor
-         *     - PartnerDocuments - Documents provided by collection partners
-         *     - DemandLetter - Formal demand letter
-         *     - Miscellaneous - Other supporting documents
+         *     Document type (optional, case-insensitive). Omit it when you do not know it; the file is then stored as not specified.
+         *     - OriginalInvoice - Invoice or credit note
+         *     - AccountStatement - Statement of account
+         *     - Contract - Contract or agreement
+         *     - TermsAndConditions - Terms and conditions
+         *     - ProofOfDelivery - Order or proof of delivery
+         *     - DemandLetter - Reminder or demand letter
+         *     - Correspondence - Correspondence with the debtor
+         *     - PaymentProof - Proof of payment
+         *     - CourtDocument - Court or legal document
+         *     - IdentityDocument - Identity document
+         *     - Miscellaneous - Other
+         *
+         *     Still accepted for existing integrations: DebtorDocuments, CreditorDocuments, PartnerDocuments.
+         *     Any other value is rejected with 400 and error InvalidDocumentType.
          */
         post: {
             parameters: {
@@ -4308,13 +4316,25 @@ export interface components {
             ineligibilityReasonCode?: string | null;
             /**
              * Format: double
-             * @description The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the
-             *     request. Present on ELIGIBLE responses too, so the floor can be shown without a second call.
-             *     Null when no partner covering this case declares a minimum.
+             * @description What this claim would have to reach to be accepted, in the currency of the request; never below
+             *     the platform minimum of 100 USD. Only present when no partner was matched. Withheld when the
+             *     client's own routing exclusions mean the number would not be reachable for them, and when the
+             *     request currency cannot be priced. Null when no partner covering this case declares a minimum.
              */
             applicableMinimumAmount?: number | null;
             /** @description ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.ApplicableMinimumAmount is expressed in. */
             applicableMinimumCurrencyCode?: string | null;
+            /**
+             * Format: double
+             * @description The smallest claim the marketplace takes for this jurisdiction and debtor type, in the currency of
+             *     the request: the lowest partner floor, never below the platform minimum of 100 USD. A statement
+             *     about the market, not about this claim: it is returned whether or not a partner was selected, and
+             *     does not depend on the claim amount or on the caller. It is not the admission rules applied when a
+             *     case is created. Null when no partner covers the market or the amount cannot be priced.
+             */
+            marketMinimumAmount?: number | null;
+            /** @description ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.MarketMinimumAmount is expressed in. */
+            marketMinimumCurrencyCode?: string | null;
             /**
              * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
              *     amount-based part of this answer was NOT actually checked It can be true on an
@@ -4854,7 +4874,9 @@ export interface components {
         };
         /**
          * Format: int32
-         * @description Stable v1 survey-generation cadence values. Serialized as their numeric values.
+         * @deprecated
+         * @description Deprecated: kept as a number and never removed, but not extended. Survey-generation cadence: 0 = Standard
+         *     (rolling monthly survey), 1 = DecisionPointOnly (no rolling surveys).
          * @enum {integer}
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.SurveyCadenceModeDto": 0 | 1;
@@ -4893,8 +4915,8 @@ export interface components {
             dateUpdated?: string | null;
             role?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatRoleDto"];
             /**
-             * @description Human-readable label for the role (e.g., "Partner", "Creditor", "Managed by partner").
-             *     Companion to Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatDto.Role — always present when Role is set.
+             * @description The sender role, readable. Always one of "Partner", "Creditor" or "Managed by partner" — these
+             *     values are stable.
              */
             roleLabel?: string | null;
             message?: string | null;
@@ -4903,7 +4925,9 @@ export interface components {
         };
         /**
          * Format: int32
-         * @description Stable v1 sender-role values. Serialized as their numeric values.
+         * @deprecated
+         * @description Deprecated: kept as a number and never removed, but not extended — read `roleLabel` instead.
+         *     Sender role: 0 = Partner, 1 = Creditor, 2 = ManagedByPartner.
          * @enum {integer}
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Chats.ChatRoleDto": 0 | 1 | 2;
@@ -5356,13 +5380,25 @@ export interface components {
             ineligibilityReasonCode?: string | null;
             /**
              * Format: double
-             * @description The lowest claim amount accepted for this jurisdiction and debtor type, in the currency of the
-             *     request. Present on ELIGIBLE responses too, so the floor can be shown without a second call.
-             *     Null when no partner covering this case declares a minimum.
+             * @description What this claim would have to reach to be accepted, in the currency of the request; never below
+             *     the platform minimum of 100 USD. Only present when no partner was matched. Withheld when the
+             *     client's own routing exclusions mean the number would not be reachable for them, and when the
+             *     request currency cannot be priced. Null when no partner covering this case declares a minimum.
              */
             applicableMinimumAmount?: number | null;
             /** @description ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ApplicableMinimumAmount is expressed in. */
             applicableMinimumCurrencyCode?: string | null;
+            /**
+             * Format: double
+             * @description The smallest claim the marketplace takes for this jurisdiction and debtor type, in the currency of
+             *     the request: the lowest partner floor, never below the platform minimum of 100 USD. A statement
+             *     about the market, not about this claim: it is returned whether or not a partner was selected, and
+             *     does not depend on the claim amount or on the caller. It is not the admission rules applied when a
+             *     case is created. Null when no partner covers the market or the amount cannot be priced.
+             */
+            marketMinimumAmount?: number | null;
+            /** @description ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.MarketMinimumAmount is expressed in. */
+            marketMinimumCurrencyCode?: string | null;
             /**
              * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
              *     amount-based part of this answer was NOT actually checked It can be true on an
