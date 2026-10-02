@@ -231,6 +231,14 @@ export function registerWriteTools(
         documentType: z
           .enum([
             "OriginalInvoice",
+            "AccountStatement",
+            "Contract",
+            "TermsAndConditions",
+            "ProofOfDelivery",
+            "Correspondence",
+            "PaymentProof",
+            "CourtDocument",
+            "IdentityDocument",
             "DebtorDocuments",
             "CreditorDocuments",
             "PartnerDocuments",
@@ -239,8 +247,10 @@ export function registerWriteTools(
           ])
           .optional()
           .describe(
-            "Document category (default: OriginalInvoice). " +
-              "Values: OriginalInvoice · DebtorDocuments · CreditorDocuments · PartnerDocuments · DemandLetter · Miscellaneous",
+            "Optional document category. Omit when unknown: the file is stored as Not specified (null). " +
+              "Choose OriginalInvoice (invoice / credit note), AccountStatement, Contract, TermsAndConditions, " +
+              "ProofOfDelivery, DemandLetter, Correspondence, PaymentProof, CourtDocument, IdentityDocument, " +
+              "or Miscellaneous (Other). Legacy names remain accepted: DebtorDocuments, CreditorDocuments, PartnerDocuments.",
           ),
       },
       annotations: { title: "Upload Case File", ...WRITE_ANNOTATIONS, idempotentHint: false },
