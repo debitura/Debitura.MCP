@@ -32,7 +32,7 @@ Please note:
   behavior against live tooling.
 - The server is **stateless** and does not persist API keys or case data; the `XApiKey` header is the
   tenant boundary and is forwarded to the Debitura Customer API per request.
-- Rate limiting and WAF protection are enforced at the Cloudflare edge in front of the endpoint.
+- Traffic to the hosted endpoint is served over HTTPS through Cloudflare.
 
 ## Authentication
 
