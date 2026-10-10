@@ -38,14 +38,16 @@ on a no-cure-no-pay basis.
 
 ### Write
 
-| Tool                | What it does                                                                                                                                                        |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create_case`       | Submit a collection case. Safety-wrapped: preview first → explicit user confirmation → idempotent submit (auto `Idempotency-Key`, safe retries, no duplicate cases) |
-| `upload_case_file`  | Attach documents to a case (invoice copies, contracts — max 25 MB)                                                                                                  |
-| `send_case_message` | Message the collection partner on a case, attributed to a named team member                                                                                         |
+| Tool                | What it does                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_case`       | Submit a collection case. Instructs the assistant to preview first and get explicit user confirmation, then submits idempotently (auto `Idempotency-Key`, safe retries, no duplicate cases) |
+| `upload_case_file`  | Attach documents to a case (invoice copies, contracts — max 25 MB)                                                                                                                          |
+| `send_case_message` | Message the collection partner on a case, attributed to a named team member                                                                                                                 |
 
-Every tool carries proper MCP annotations (`readOnlyHint` / `destructiveHint`), and `create_case`
-never auto-fires — it is a legal/financial action and always requires explicit human confirmation.
+Every tool carries MCP annotations (`readOnlyHint` / `destructiveHint`); the write tools are marked
+destructive. `create_case` is a legal/financial action: its tool description tells the assistant to
+run `preview_case` and get the user's explicit confirmation before submitting. Whether your MCP
+client also asks before running a tool depends on the client and its settings.
 
 ## Distribution
 
@@ -134,10 +136,11 @@ Ask your assistant: _"Ping Debitura"_ → you should see `✓ Connected as {your
 - **Authentication & tenancy.** The `XApiKey` header IS the tenant boundary. The server is
   **stateless** — each request creates a fresh MCP server bound to the caller's API key, which is
   passed straight through to the Debitura Customer API. No keys or case data are stored.
-- **Rate limiting** is handled at the **Cloudflare edge** (WAF / rate rules) that fronts
-  `mcp.debitura.com`, not in-app. Note that some tools fan out to multiple Customer-API calls per
-  invocation (e.g. `get_account_summary` queries one count per lifecycle stage), which the edge
-  limits account for.
+- **Transport.** The hosted endpoint is served over HTTPS through Cloudflare.
+- **Rate limits.** Tool calls are forwarded to the Debitura Customer API, so the Customer API's
+  [rate limits](https://docs.debitura.com/developer-concepts/rate-limiting) apply to your API key.
+  Some tools make several Customer API calls per invocation (e.g. `get_account_summary` queries one
+  count per lifecycle stage), and each call counts.
 - **Vulnerability reports:** see [SECURITY.md](./SECURITY.md).
 
 ## Self-hosting / development
