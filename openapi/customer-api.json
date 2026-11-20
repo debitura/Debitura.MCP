@@ -23,7 +23,7 @@
           "Cases"
         ],
         "summary": "Create collection case",
-        "description": "Creates a new collection case for debt collection.\n\n**Test Mode:**\n- Set isTest=true to create a test case (case IS created in the database but marked as test data)\n- Test cases are excluded from production metrics and can be easily filtered or deleted\n- Use test mode for integration testing and development\n\n**Debtor Rules:**\n- debtor.type must be \"Company\" or \"Private\"\n  - Company → debtor.name is mandatory (company name)\n  - Private → debtor.name is mandatory (person's full name)\n\n**Geographic Rules:**\n- debtor.countryAlpha2 (ISO 3166-1 alpha-2) is always required\n- debtor.state is a free-text region description\n- For US debtors: debtor.stateAlpha2 (two-letter state code) is also required – debtor.state is ignored in that scenario\n- Customer API submissions are limited to cases that match an exclusive pre-legal partner.\n  If no eligible partner matches, the API returns 422 and does not create a case. The\n  interactive portal's custom-quote/network-lead fallback is not available through this API.\n\n**Claim Amount and Aging — three ways to send it:**\n1. `amountToRecover` plus a single `dueDate`\n2. `amountToRecover` plus the cumulative `amountToRecoverOver6/12/24Months` buckets\n3. `claimLines[]` — send the unpaid invoices and let us do the arithmetic (recommended for multi-invoice claims)\n\n```\n\"claimLines\": [\n  { \"dueDate\": \"2024-01-15\", \"amount\": 423.42, \"reference\": \"INV-1001\" },\n  { \"dueDate\": \"2025-05-02\", \"amount\": 700.87, \"reference\": \"INV-1042\" }\n]\n```\n\n- `amount` is the **outstanding balance** on that invoice — what the debtor still owes on it, already\n  net of payments received and credit notes issued. It is not the invoice's original face value.\n  Leave fully settled invoices out; every amount must be greater than zero, with at most 2 decimals.\n- We derive `amountToRecover` and all three age buckets from the lines, so send `claimLines`\n  **instead of** `amountToRecover` and the `amountToRecoverOver6/12/24Months` fields. Sending both is a 400.\n- Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest\n  age profile on a part-paid claim, because the buckets are then computed on the same outstanding\n  balances the total is computed on.\n- `claimLines` is a pricing input only. It is not stored and is not shown to the collecting partner —\n  include a per-invoice breakdown in `comments` if the partner needs to see one.\n- Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.\n- If you omit the case-level `dueDate`, it is set to the oldest due date across your lines — so in that\n  case `date` must not be later than the earliest `claimLines` due date, or the request is rejected with\n  a 400 on `date`. Send an explicit `dueDate` if you need a different case due date.\n\n**Optional Parameters:**\n- creditorDivisionId - Assign case to a specific division (for multi-division creditors)\n- collectionPartnerId - Override automatic partner assignment with a specific collection partner\n- skipDebituraVerification - Skip internal verification steps (advanced use)\n- skipCreationEmails - Deprecated: accepted for backwards compatibility but ignored server-side. Creation emails are always suppressed in favour of the hourly CasesStarted digest\n- allowPendingContracts - Accept cases with unsigned contracts in 'PendingContractSigning' status instead of returning 422\n\n**Error Responses:**\n- 400: Field validation errors (returns JSON object with field names as keys and error arrays as values)\n- 422: Business rule violations (returns BusinessErrorResponseApiDTO with type, message, and solutionUrl)\n- 500: Server errors",
+        "description": "Creates a new collection case for debt collection.\n\n**Test Mode:**\n- Set isTest=true to create a test case (case IS created in the database but marked as test data)\n- Test cases are excluded from production metrics and can be easily filtered or deleted\n- Use test mode for integration testing and development\n\n**Debtor Rules:**\n- debtor.type must be \"Company\" or \"Private\"\n  - Company → debtor.name is mandatory (company name)\n  - Private → debtor.name is mandatory (person's full name)\n\n**Geographic Rules:**\n- debtor.countryAlpha2 (ISO 3166-1 alpha-2) is always required\n- debtor.state is a free-text region description\n- For US debtors: debtor.stateAlpha2 (two-letter state code) is also required – debtor.state is ignored in that scenario\n- Customer API submissions are limited to cases that match an exclusive pre-legal partner.\n  If no eligible partner matches, the API returns 422 and does not create a case. The\n  interactive portal's custom-quote/network-lead fallback is not available through this API.\n\n**Claim Amount and Aging — three ways to send it:**\n1. `amountToRecover` plus a single `dueDate`\n2. `amountToRecover` plus the cumulative `amountToRecoverOver6/12/24Months` buckets\n3. `claimLines[]` — send the unpaid invoices and let us do the arithmetic (recommended for multi-invoice claims)\n\n```\n\"claimLines\": [\n  { \"dueDate\": \"2024-01-15\", \"amount\": 423.42, \"reference\": \"INV-1001\" },\n  { \"dueDate\": \"2025-05-02\", \"amount\": 700.87, \"reference\": \"INV-1042\" }\n]\n```\n\n- `amount` is the **outstanding balance** on that invoice — what the debtor still owes on it, already\n  net of payments received and credit notes issued. It is not the invoice's original face value.\n  Leave fully settled invoices out; every amount must be greater than zero, with at most 2 decimals.\n- We derive `amountToRecover` and all three age buckets from the lines, so send `claimLines`\n  **instead of** `amountToRecover` and the `amountToRecoverOver6/12/24Months` fields. Sending both is a 400.\n- Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest\n  age profile on a part-paid claim, because the buckets are then computed on the same outstanding\n  balances the total is computed on.\n- `claimLines` is a pricing input only. It is not stored and is not shown to the collecting partner —\n  include a per-invoice breakdown in `comments` if the partner needs to see one.\n- Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.\n- If you omit the case-level `dueDate`, it is set to the oldest due date across your lines — so in that\n  case `date` must not be later than the earliest `claimLines` due date, or the request is rejected with\n  a 400 on `date`. Send an explicit `dueDate` if you need a different case due date.\n\n**Optional Parameters:**\n- creditorDivisionId - Assign case to a specific division (for multi-division creditors)\n- allowPendingContracts - Accept cases with unsigned contracts in 'PendingContractSigning' status instead of returning 422\n\n**Error Responses:**\n- 400: Field validation errors (returns JSON object with field names as keys and error arrays as values)\n- 422: Business rule violations (returns BusinessErrorResponseApiDTO with type, message, and solutionUrl)\n- 500: Server errors",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -148,7 +148,7 @@
           "Cases"
         ],
         "summary": "List collection cases",
-        "description": "Returns a paginated list of collection cases for your account.\n\n**Pagination:**\n- page (default: 1) - Page number, starting from 1\n- pageSize (default: 10, max: 100) - Number of results per page\n\n**Filters:**\n- statuses - Filter by case lifecycle status (comma-separated list)\n  Valid values: PendingContractSigning, PendingVerificationInternal, PendingVerification,\n  NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged\n  (case-insensitive; both name and description forms accepted)\n- divisionIds - Filter by creditor division IDs (comma-separated GUIDs, for multi-division creditors)\n- debtorIds - Filter by specific debtor IDs (comma-separated GUIDs)\n- ids - Filter by specific case IDs (comma-separated GUIDs)\n\n**Sorting:**\n- sort - Sort field and direction (format: 'field:direction')\n  Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,\n  DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,\n  Lifecycle, CloseCode\n  Examples: 'DateCreated:desc', 'DueDate:asc', 'GrossAmount:desc'\n  Unknown fields are silently ignored.\n\n**Response:**\n- Returns InvoiceListApiDTO with page metadata and cases array\n- Page metadata includes: totalResults, currentPage, skipped, pageSize",
+        "description": "Returns a paginated list of collection cases for your account.\n\n**Pagination:**\n- page (default: 1) - Page number, starting from 1\n- pageSize (default: 10, max: 100) - Number of results per page\n\n**Filters:**\n- statuses - Filter by case lifecycle status (comma-separated list)\n  Valid values: PendingContractSigning, PendingVerificationInternal, PendingVerification,\n  NeedsAdditionalDetails, Leads, LeadsQuoteGiven, Active, Paused, Closed, Merged\n  (case-insensitive; both name and description forms accepted)\n- divisionIds - Filter by creditor division IDs (comma-separated GUIDs, for multi-division creditors)\n- debtorIds - Filter by specific debtor IDs (comma-separated GUIDs)\n- ids - Filter by specific case IDs (comma-separated GUIDs)\n\n**Sorting:**\n- sort - Sort field and direction (format: 'field:direction')\n  Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,\n  DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,\n  Lifecycle, CloseCode, ClaimType, Reference, CreditorReference, CollectionPartnerReference,\n  Type, Classification, Debtor, Creditor, Country, ExclusivityEndDate, ActiveCollectionPeriodEndDate,\n  PaymentTotalSum, CurrentPhase, CollectionPartner, Jurisdiction,\n  ManagedByPartner, CreditorDivision, AssignedCollectorUser, AssignedCreditorUser,\n  AssignedManagingPartnerUser, ReferralPartner\n  Examples: 'DateCreated:desc', 'DueDate:asc', 'GrossAmount:desc'\n  Unknown fields return HTTP 400. Equal values are ordered by case ID in the last requested direction.\n\n**Response:**\n- Returns InvoiceListApiDTO with page metadata and cases array\n- Page metadata includes: totalResults, currentPage, skipped, pageSize",
         "parameters": [
           {
             "name": "Page",
@@ -270,7 +270,7 @@
           "Cases"
         ],
         "summary": "Preview case eligibility and requirements",
-        "description": "Preview what would happen if you submitted a case, without actually creating it.\n\n**What This Endpoint Returns:**\n- IsEligible - Whether the case can be submitted (partner available)\n- PartnerAssignment - Which collection partner would handle the case\n- RequiredActions - What contracts/documents need to be signed before submission\n  - Standard Debt Collection Agreement (SDCA)\n  - Power of Attorney (PoA) for the assigned partner\n- PricingPreview - Estimated success fee with age-based surcharges\n- Jurisdiction - Geographic details\n\n**Use This To:**\n1. Check if a jurisdiction is supported before submitting\n2. Determine which documents need signing before case creation\n3. Get signing URLs to guide users through required actions\n4. Estimate pricing including age surcharges\n\n**Required Fields:**\n- AmountToRecover - Total principal amount\n- CurrencyCode - ISO 4217 currency code (e.g., 'DKK', 'EUR', 'USD')\n- Debtor.Type - 'Company' or 'Private'\n- Debtor.CountryAlpha2 - ISO 3166-1 alpha-2 country code\n- Debtor.StateAlpha2 - Required for US cases only (e.g., 'CA', 'NY')\n\n**Optional Fields (Multi-Invoice Age Pricing):**\n- AmountToRecoverOver12Months - Portion over 12 months overdue\n- AmountToRecoverOver24Months - Portion over 24 months overdue\n(Both must be provided together if used)\n- AmountToRecoverOver6Months - Portion over 6 months overdue (optional, improves pricing tier accuracy at the 180-day threshold; requires Over12/Over24)\n\n**Optional Fields (Claim Lines — recommended for multi-invoice claims):**\nInstead of totalling the claim and computing the buckets yourself, send the unpaid invoices:\n\n```\n\"claimLines\": [\n  { \"dueDate\": \"2024-01-15\", \"amount\": 423.42, \"reference\": \"INV-1001\" },\n  { \"dueDate\": \"2025-05-02\", \"amount\": 700.87, \"reference\": \"INV-1042\" }\n]\n```\n\n- `amount` is the **outstanding balance** on that invoice, already net of payments and credit notes.\n- We derive `amountToRecover` and all three age buckets from the lines and price on them, so send\n  `claimLines` **instead of** `amountToRecover`, the `amountToRecoverOver6/12/24Months` fields, and\n  `dueDate`. Combining any of those with `claimLines` is a 400.\n- Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest\n  age profile on a part-paid claim.\n- Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.\n- The same ledger produces the same quote here and on POST /cases.\n\n**Solution URLs Are Context-Aware:**\n- Bearer token (referral partner) → referral onboarding URLs\n- XApiKey (creditor) → standard creditor app URLs\n\n**Important Notes:**\n- This endpoint does NOT create a case - it only previews what would happen\n- The preview uses the same eligibility logic as POST /cases\n- If multiple partners match (system limitation), the first match is returned\n- All required actions must be completed before calling POST /cases\n\n**Example Workflow:**\n```\n1. POST /cases/preview → Check eligibility and get signing URLs\n2. User completes required actions (signs SDCA, signs PoA)\n3. POST /cases → Create the actual case\n```",
+        "description": "Preview what would happen if you submitted a case, without actually creating it.\n\n**What This Endpoint Returns:**\n- IsEligible - Whether the case can be submitted (partner available)\n- PartnerAssignment - Which collection partner would handle the case\n- RequiredActions - What contracts/documents need to be signed before submission\n  - Standard Debt Collection Agreement (SDCA)\n  - Power of Attorney (PoA) for the assigned partner\n- PricingPreview - Estimated success fee with age-based surcharges\n- Jurisdiction - Geographic details\n\n**Use This To:**\n1. Check if a jurisdiction is supported before submitting\n2. Determine which documents need signing before case creation\n3. Get signing URLs to guide users through required actions\n4. Estimate pricing including age surcharges\n\n**Required Fields:**\n- AmountToRecover - Total principal amount\n- CurrencyCode - ISO 4217 currency code (e.g., 'DKK', 'EUR', 'USD')\n- Debtor.Type - 'Company' or 'Private'\n- Debtor.CountryAlpha2 - ISO 3166-1 alpha-2 country code\n- Debtor.StateAlpha2 - Required for US cases only (e.g., 'CA', 'NY')\n\n**Optional Fields (Multi-Invoice Age Pricing):**\n- AmountToRecoverOver12Months - Portion over 12 months overdue\n- AmountToRecoverOver24Months - Portion over 24 months overdue\n(Both must be provided together if used)\n- AmountToRecoverOver6Months - Portion over 6 months overdue (optional, improves pricing tier accuracy at the 180-day threshold; requires Over12/Over24)\n\n**Optional Fields (Claim Lines — recommended for multi-invoice claims):**\nInstead of totalling the claim and computing the buckets yourself, send the unpaid invoices:\n\n```\n\"claimLines\": [\n  { \"dueDate\": \"2024-01-15\", \"amount\": 423.42, \"reference\": \"INV-1001\" },\n  { \"dueDate\": \"2025-05-02\", \"amount\": 700.87, \"reference\": \"INV-1042\" }\n]\n```\n\n- `amount` is the **outstanding balance** on that invoice, already net of payments and credit notes.\n- We derive `amountToRecover` and all three age buckets from the lines and price on them, so send\n  `claimLines` **instead of** `amountToRecover`, the `amountToRecoverOver6/12/24Months` fields, and\n  `dueDate`. Combining any of those with `claimLines` is a 400.\n- Use `claimLines` whenever the debtor has already part-paid: it is the only way to express an honest\n  age profile on a part-paid claim.\n- Maximum 1000 lines. Per-line errors are returned keyed by index, e.g. `ClaimLines[2].DueDate`.\n- The same ledger produces the same quote here and on POST /cases.\n\n**Solution URLs Are Context-Aware:**\n- Bearer token (referral partner) → referral onboarding URLs\n- XApiKey (creditor) → standard creditor app URLs\n\n**Important Notes:**\n- This endpoint does NOT create a case - it only previews what would happen\n- A matched preview applies the same monetary admission rules as POST /cases; create revalidates all rules\n- Monetary refusals return AmountBelowMinimum and admissionMinimum (rule, USD amount, request-currency amount and currency code)\n- amountCheckUnavailable means monetary eligibility is provisional because a required conversion was unavailable\n- Unmatched cases remain ineligible at every amount; this API does not offer network/custom-quote submission\n- If multiple partners match (system limitation), the first match is returned\n- All required actions must be completed before calling POST /cases\n\n**Example Workflow:**\n```\n1. POST /cases/preview → Check eligibility and get signing URLs\n2. User completes required actions (signs SDCA, signs PoA)\n3. POST /cases → Create the actual case\n```",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -3542,7 +3542,7 @@
           "WebhookEvents"
         ],
         "summary": "List webhook events dispatched for a case.",
-        "description": "Returns all webhook events dispatched for the given case, scoped to your webhook subscriptions.\nResults are ordered newest-first.\n\n**Use cases:**\n- Verify that a specific event (e.g. `case.updated`) fired after a state transition.\n- Inspect the exact payload delivered on each attempt.\n- Find the event ID to replay via `POST /webhooks/events/{id}/replay`.\n\n**Filtering:**\n- `caseId` (required): restricts to events for this case.\n- `since` (optional): only returns events created at or after this ISO 8601 timestamp.\n\n**Note:** Only events for your subscriptions are returned — events from other creditors' subscriptions are never exposed.",
+        "description": "Returns all webhook events dispatched for the given case, scoped to your webhook subscriptions.\nResults are ordered newest-first.\n\n**Use cases:**\n- Verify that a specific event (e.g. `case.updated`) fired after a state transition.\n- Inspect the exact payload delivered on each attempt.\n- Find the event ID to replay via `POST /webhooks/events/{id}/replay`.\n\n**Filtering:**\n- `caseId` (required): restricts to events for this case.\n- `since` (optional): only returns events created at or after this ISO 8601 timestamp.\n\n**Note:** Only events for your subscriptions are returned — events from other creditors' subscriptions are never exposed.\n\n**Retention:** event payloads are kept for 28 days. After that the event is still listed, with an empty `payload`, and can no longer be replayed.",
         "parameters": [
           {
             "name": "caseId",
@@ -3603,7 +3603,7 @@
           "WebhookEvents"
         ],
         "summary": "Replay a specific webhook event.",
-        "description": "Re-enqueues the exact payload from a previously recorded event to its original subscription.\n\nThe event is re-queued as a fresh delivery attempt (attempt 1) using the original payload unchanged.\nDelivery follows the normal retry schedule if the endpoint is unavailable.\n\n**Replay signal:** Replayed deliveries include the header `X-Debitura-Replay: true` so your endpoint can distinguish a replay from a live event and implement idempotency correctly.\n\n**When to use:**\n- Your endpoint was temporarily unavailable and you want to re-deliver a specific event.\n- You want to test idempotency of your event handler.\n- Part of CI-loop ASSERT: confirm an event was dispatched, then replay to a different receiver.\n\n**Tenant isolation:** Only events belonging to your own subscriptions can be replayed.",
+        "description": "Re-enqueues the exact payload from a previously recorded event to its original subscription.\n\nThe event is re-queued as a fresh delivery attempt (attempt 1) using the original payload unchanged.\nDelivery follows the normal retry schedule if the endpoint is unavailable.\n\n**Replay signal:** Replayed deliveries include the header `X-Debitura-Replay: true` so your endpoint can distinguish a replay from a live event and implement idempotency correctly.\n\n**When to use:**\n- Your endpoint was temporarily unavailable and you want to re-deliver a specific event.\n- You want to test idempotency of your event handler.\n- Part of CI-loop ASSERT: confirm an event was dispatched, then replay to a different receiver.\n\n**Tenant isolation:** Only events belonging to your own subscriptions can be replayed.\n\n**Retention:** events older than 28 days have had their payload cleared and return `410 Gone`.",
         "parameters": [
           {
             "name": "id",
@@ -3638,6 +3638,9 @@
           },
           "404": {
             "description": "Event not found or not owned by this creditor"
+          },
+          "410": {
+            "description": "Event is older than 28 days; its payload is no longer available"
           }
         }
       }
@@ -3648,7 +3651,7 @@
           "Webhooks"
         ],
         "summary": "Create a new webhook subscription.",
-        "description": "Creates a new webhook subscription for receiving real-time event notifications.\n\n**Available Events:**\n- `case.created` - New collection case created\n- `case.updated` - Case lifecycle changed (e.g., Active → Paused). Does not cover engagement phase\n  changes (Pre-legal/Legal/Enforcement) — poll `GET /cases/{id}` or `GET /cases/{id}/timeline` for\n  the current phase; there is no phase-change event today.\n- `case.closed` - Case closed\n- `payment.created` - Payment registered on case\n- `payment.deleted` - Payment reversed (deleted) on case\n- `chat.created` - Chat message created on case\n\n**Validation Rules:**\n- URL must be HTTPS\n- events array must contain only valid event types\n- URL must be publicly reachable\n- Private IP addresses are blocked (SSRF protection)\n\n**Returns:**\n- Webhook subscription details\n- Secret key for HMAC-SHA256 signature verification (shown only once)\n\n**IMPORTANT**: Save the secret immediately - it cannot be retrieved later.\n\n**Webhook Payload Structure:**\nEvery webhook delivery will contain these headers:\n- X-Debitura-Signature: HMAC-SHA256 signature (format: t={timestamp},v1={signature})\n- X-Debitura-Timestamp: Unix timestamp of the event\n- X-Debitura-Event: Event type (e.g., 'case.created')\n\n**Signature Verification (HMAC-SHA256):**\n1. Extract timestamp (t) and signature (v1) from X-Debitura-Signature header\n2. Construct signed payload: {timestamp}.{json_body}\n3. Compute HMAC-SHA256 using your webhook secret (Base64 decoded)\n4. Compare computed signature with v1 value (use constant-time comparison)\n5. Verify timestamp is within 5 minutes to prevent replay attacks\n\n**Example Payload:**\n```json\n{\n  \"id\": \"evt_abc123\",\n  \"event\": \"case.created\",\n  \"timestamp\": \"2024-01-15T10:30:00Z\",\n  \"data\": {\n    \"caseId\": \"guid-here\",\n    \"reference\": \"Q8OAXF3W\",\n    \"creditorReference\": \"INV-001\",\n    \"status\": \"Active\",\n    \"amount\": 1000.00,\n    \"currency\": \"EUR\",\n    \"debtorName\": \"Debtor Company Ltd\"\n  }\n}\n```",
+        "description": "Creates a new webhook subscription for receiving real-time event notifications.\n\n**Available Events:**\n- `case.created` - New collection case created\n- `case.updated` - Case lifecycle changed (e.g., Active → Paused). Does not cover engagement phase\n  changes (Pre-legal/Legal/Enforcement) — poll `GET /cases/{id}` or `GET /cases/{id}/timeline` for\n  the current phase; there is no phase-change event today.\n- `case.closed` - Case closed\n- `payment.created` - Payment registered on case\n- `payment.deleted` - Payment reversed (deleted) on case\n- `chat.created` - Chat message created on case\n\n**Validation Rules:**\n- URL must be HTTPS\n- events array must contain only valid event types\n- URL must be publicly reachable\n- Private IP addresses are blocked (SSRF protection)\n\n**Returns:**\n- Webhook subscription details\n- Secret key for HMAC-SHA256 signature verification (shown only once)\n\n**IMPORTANT**: Save the secret immediately - it cannot be retrieved later.\n\n**Webhook Payload Structure:**\nEvery webhook delivery will contain these headers:\n- X-Debitura-Signature: HMAC-SHA256 signature (format: t={timestamp},v1={signature})\n- X-Debitura-Timestamp: Unix timestamp of the event\n- X-Debitura-Event: Event type (e.g., 'case.created')\n\n**Signature Verification (HMAC-SHA256):**\n1. Extract timestamp (t) and signature (v1) from X-Debitura-Signature header\n2. Construct signed payload: {timestamp}.{json_body}\n3. Compute HMAC-SHA256 using your webhook secret (Base64 decoded)\n4. Compare computed signature with v1 value (use constant-time comparison)\n5. Verify timestamp is within 5 minutes to prevent replay attacks\n\n**Example Payload:**\n```json\n{\n  \"id\": \"bfa8af05-4bd1-4fd5-8f80-a6357f99dc59\",\n  \"specVersion\": \"1.0\",\n  \"event\": \"case.created\",\n  \"timestamp\": \"2024-01-15T10:30:00Z\",\n  \"data\": {\n    \"caseId\": \"72d427c1-c38c-48db-b369-6f4a2e9cad3f\",\n    \"reference\": \"Q8OAXF3W\",\n    \"lifecycle\": \"Pending Verification Internal\"\n  },\n  \"links\": {\n    \"self\": \"https://customer-api.debitura.com/Cases/72d427c1-c38c-48db-b369-6f4a2e9cad3f\"\n  }\n}\n```",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
@@ -4360,7 +4363,7 @@
         "type": "object",
         "properties": {
           "url": {
-            "maxLength": 1024,
+            "maxLength": 800,
             "minLength": 0,
             "type": "string",
             "format": "uri"
@@ -4382,7 +4385,7 @@
         "type": "object",
         "properties": {
           "url": {
-            "maxLength": 1024,
+            "maxLength": 800,
             "minLength": 0,
             "type": "string",
             "format": "uri",
@@ -4486,6 +4489,33 @@
           }
         },
         "additionalProperties": false
+      },
+      "Debitura.Web.ExternalApi.Contracts.V1.Cases.AdmissionMinimumDto": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string",
+            "description": "PlatformMinimum (configured client/partner/platform floor) or UnitedStatesMinimum.",
+            "nullable": true
+          },
+          "amountUsd": {
+            "type": "number",
+            "description": "The minimum principal in USD.",
+            "format": "double"
+          },
+          "amount": {
+            "type": "number",
+            "description": "The minimum principal in the request currency, rounded upward to two decimals.",
+            "format": "double"
+          },
+          "currencyCode": {
+            "type": "string",
+            "description": "ISO currency code of Amount.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Safe, additive metadata for a monetary admission refusal. Recheck preview after changing the claim."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Cases.AdvanceTestCaseResponse": {
         "type": "object",
@@ -4622,7 +4652,7 @@
           },
           "solutionUrl": {
             "type": "string",
-            "description": "A URL where the user can resolve this <i>specific</i> error (e.g., sign a contract).\n            \n\nPartners who want a <b>single URL</b> that walks the user through every pending\nsigning in one chain — instead of forwarding one URL per\n`BusinessErrorApiDTO` — should use\nDebitura.Web.ExternalApi.Contracts.V1.Cases.BusinessErrorResponseApiDTO.SigningHandoff's `CombinedSigningUrl`.\nThe two are complementary: `SolutionUrl` is granular per-error;\n`CombinedSigningUrl` is the chain-walking alternative for signing-related errors.",
+            "description": "A URL where the user can resolve this <i>specific</i> error (e.g., sign a contract).\n            \n\nPartners who want a <b>single URL</b> that walks the user through every pending\nsigning in one chain — instead of forwarding one URL per\n`BusinessErrorApiDTO` — should use\nSigningHandoff's `CombinedSigningUrl`.\nThe two are complementary: `SolutionUrl` is granular per-error;\n`CombinedSigningUrl` is the chain-walking alternative for signing-related errors.",
             "nullable": true
           }
         },
@@ -5017,7 +5047,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Additive external-API read model. Per-bucket outstanding on the debt ledger, produced by\nthe payment allocation engine (bucket total minus Σ active stored allocations — never re-derived\nfrom a model). Mirrors the internal\n`Debitura.Domain.Model.Receiveables.InvoiceEconomics.EconomicalAllocationOutstanding` shape."
+        "description": "What is still open on the case in each part of the claim: principal, interest, reminder fees and\ncollection fees. Each part is its total on the case minus the payments allocated to it, never below 0.\nEvery payment is split across the parts in proportion to what is open in each just before it; a\npayment that clears the whole balance clears every part, and any excess counts as principal. Before\nany payment, principal equals grossAmount. Filled only on the Customer API's single-case reads\n(GET /cases/{id}, by creditor reference, by case reference); always null elsewhere. Also null when\na payment on the case was recorded before this split was stored; such a case is normally filled\nfrom its next payment on."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto": {
         "type": "object",
@@ -5110,7 +5140,7 @@
           },
           "currentEngagementPhase": {
             "type": "string",
-            "description": "The current phase of the case's engagement: \"Pre-legal\", \"Legal\", or \"Enforcement\".\nA different axis from Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.Lifecycle/Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.CloseCode — an Active case can be\nin any of the three phases.\n            \nNull means \"no active engagement\" (e.g. lead / quoting / pre-contract-signing / unassigned, or\na data-consistency gap) — this is a distinct third state, NOT a synonym for Pre-legal. Most\ncases legitimately read Pre-legal; phase only leaves Pre-legal on legal/enforcement quote flows.\n            \nNot guaranteed to be monotonic: an admin correction can move phase backwards (e.g. Legal back\nto Pre-legal).\n            \nPersists after case closure — reflects the case's last-known engagement phase, not the current\nLifecycle. Note: this is a different field from a lead quote's own offered phase (the phase a\npartner's quote proposes to work the case at, if this case ever went through a quote flow) —\nthis field is the case-level phase of its actual engagement, not a quote's terms.",
+            "description": "The current phase of the case's engagement: \"Pre-legal\", \"Legal\", or \"Enforcement\".\nA different axis from Lifecycle/CloseCode — an Active case can be\nin any of the three phases.\n            \nNull means \"no active engagement\" (e.g. lead / quoting / pre-contract-signing / unassigned, or\na data-consistency gap) — this is a distinct third state, NOT a synonym for Pre-legal. Most\ncases legitimately read Pre-legal; phase only leaves Pre-legal on legal/enforcement quote flows.\n            \nNot guaranteed to be monotonic: an admin correction can move phase backwards (e.g. Legal back\nto Pre-legal).\n            \nPersists after case closure — reflects the case's last-known engagement phase, not the current\nLifecycle. Note: this is a different field from a lead quote's own offered phase (the phase a\npartner's quote proposes to work the case at, if this case ever went through a quote flow) —\nthis field is the case-level phase of its actual engagement, not a quote's terms.",
             "nullable": true
           },
           "claimType": {
@@ -5164,7 +5194,7 @@
           },
           "disputeStatus": {
             "type": "string",
-            "description": "Whether the claim is disputed by the debtor.\nReturns the description of Debitura.Domain.Model.Receiveables.Invoices.Enums.ClaimDisputeStatus:\n\"Yes, the claim is disputed\", \"No, the claim is not disputed\", or \"Don't Know\".\nNull when the dispute status has not been set on the case.",
+            "description": "Whether the claim is disputed by the debtor.\nOne of: \"Yes, the claim is disputed\", \"No, the claim is not disputed\", or \"Don't Know\".\nNull when the dispute status has not been set on the case.",
             "nullable": true
           },
           "validation": {
@@ -5263,17 +5293,20 @@
         "properties": {
           "isEligible": {
             "type": "boolean",
-            "description": "Whether the case is eligible for collection (i.e., a collection partner is available).\nIf false, check IneligibilityReason for details."
+            "description": "Whether a collection partner is available and submit's monetary admission checks pass.\nIf false, check IneligibilityReason for details."
           },
           "ineligibilityReason": {
             "type": "string",
-            "description": "Explanation of why the case is not eligible (only present when IsEligible = false).\nBranch on Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReasonCode rather than on this text, which may be reworded.",
+            "description": "Explanation of why the case is not eligible (only present when IsEligible = false).\nBranch on IneligibilityReasonCode rather than on this text, which may be reworded.",
             "nullable": true
           },
           "ineligibilityReasonCode": {
             "type": "string",
-            "description": "Stable machine-readable reason, present whenever Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReason is\nOne of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum,\nDebtorTypeNotCovered, NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.\n\nOnly NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum\nmeans the geography IS covered and only the claim amount fell short. EligibilityUndetermined\nis a transient failure on our side, not a statement about coverage — retry rather than\ntelling the client their address is wrong.",
+            "description": "Stable machine-readable reason, present whenever IneligibilityReason is\nOne of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum,\nDebtorTypeNotCovered, NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.\n\nOnly NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum\nmeans the geography IS covered and only the claim amount fell short. EligibilityUndetermined\nis a transient failure on our side, not a statement about coverage — retry rather than\ntelling the client their address is wrong.",
             "nullable": true
+          },
+          "admissionMinimum": {
+            "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.AdmissionMinimumDto"
           },
           "applicableMinimumAmount": {
             "type": "number",
@@ -5283,7 +5316,7 @@
           },
           "applicableMinimumCurrencyCode": {
             "type": "string",
-            "description": "ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.ApplicableMinimumAmount is expressed in.",
+            "description": "ISO code that ApplicableMinimumAmount is expressed in.",
             "nullable": true
           },
           "marketMinimumAmount": {
@@ -5294,12 +5327,12 @@
           },
           "marketMinimumCurrencyCode": {
             "type": "string",
-            "description": "ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.MarketMinimumAmount is expressed in.",
+            "description": "ISO code that MarketMinimumAmount is expressed in.",
             "nullable": true
           },
           "amountCheckUnavailable": {
             "type": "boolean",
-            "description": "True when a currency conversion needed to evaluate the claim amount was unavailable, so the\namount-based part of this answer was NOT actually checked It can be true on an\neligible answer: a partner matched only because amount conditions failed open while rates were\ndown. Treat such an answer as provisional and retry rather than relying on the floor having\nbeen applied."
+            "description": "True when a currency conversion needed to evaluate the claim amount was unavailable, so the\namount-based part of matching or monetary admission was NOT actually checked. It can be true on an\neligible answer: a partner matched only because amount conditions failed open while rates were\ndown. Treat such an answer as provisional and retry rather than relying on the floor having\nbeen applied."
           },
           "partnerAssignment": {
             "$ref": "#/components/schemas/Debitura.Web.ExternalApi.Contracts.V1.Cases.PartnerAssignmentDto"
@@ -5498,15 +5531,6 @@
             "description": "OPTIONAL - the unpaid invoices making up this claim, one line per invoice, each carrying its\nown outstanding balance and payment deadline.\n            \nWhen supplied, the server derives AmountToRecover and all three cumulative age buckets from\nthese lines, so send them instead of — never alongside — AmountToRecover and the\nAmountToRecoverOver6/12/24Months fields. Supplying both is rejected with a 400.\n            \nUse this whenever the debtor has already part-paid the claim: the buckets are then computed\non the same outstanding balances the total is computed on, so the age profile stays honest.\nMaximum 1000 lines. When DueDate is omitted on the case, it is derived as the oldest line\ndue date; an explicit DueDate is honoured.\n            \nClaim lines are a pricing input only — they are not stored and are never shown to the\ncollecting partner.",
             "nullable": true
           },
-          "skipDebituraVerification": {
-            "type": "boolean",
-            "description": "This skips the 'Pending verification' for Debitura and puts case straight to partner"
-          },
-          "skipCreationEmails": {
-            "type": "boolean",
-            "description": "Deprecated — this field is accepted for backwards compatibility but is ignored server-side.\nCreation emails are always suppressed; the hourly CasesStarted digest is the single\nnotification channel for all entry points.",
-            "deprecated": true
-          },
           "allowPendingContracts": {
             "type": "boolean",
             "description": "When true, cases with unsigned contracts (SDCA/POA) are accepted in 'PendingContractSigning'\nstatus instead of being rejected with 422. The case transitions automatically once contracts are signed.\nDefault: false (unsigned contracts return 422)."
@@ -5519,12 +5543,6 @@
             "maxLength": 100,
             "type": "string",
             "description": "Optional tag for scoped test data grouping (e.g. \"suite-run-{uuid}\").\nUse this to group test cases created by a single CI pipeline run so they can be\nbulk-deleted via DELETE /test/cases?tag={tag} without affecting parallel runs.\nOnly meaningful when IsTest is true. Max 100 characters.",
-            "nullable": true
-          },
-          "collectionPartnerId": {
-            "type": "string",
-            "description": "Optional: Specify a collection partner ID to handle this case.\nWhen provided, this partner will be used regardless of lead agent matching rules.\nThe partner must be active and have coverage for the debtor's jurisdiction.",
-            "format": "uuid",
             "nullable": true
           },
           "assignedUserEmail": {
@@ -5715,7 +5733,7 @@
           },
           "solutionUrl": {
             "type": "string",
-            "description": "URL where the user can complete this <i>specific</i> action (e.g., contract signing page).\nThe URL is context-aware: referral partner tokens get referral onboarding URLs,\nregular API keys get standard creditor app URLs.\n            \n\nPartners who want a <b>single URL</b> that walks the user through every pending\naction in one chain — instead of forwarding one URL per `RequiredActionDto` —\nshould use Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.SigningHandoff's\n`CombinedSigningUrl`. The two are complementary: `SolutionUrl` is granular\nper-action; `CombinedSigningUrl` is the chain-walking alternative for\nsigning-related actions.",
+            "description": "URL where the user can complete this <i>specific</i> action (e.g., contract signing page).\nThe URL is context-aware: referral partner tokens get referral onboarding URLs,\nregular API keys get standard creditor app URLs.\n            \n\nPartners who want a <b>single URL</b> that walks the user through every pending\naction in one chain — instead of forwarding one URL per `RequiredActionDto` —\nshould use SigningHandoff's\n`CombinedSigningUrl`. The two are complementary: `SolutionUrl` is granular\nper-action; `CombinedSigningUrl` is the chain-walking alternative for\nsigning-related actions.",
             "nullable": true
           },
           "isBlocking": {
@@ -6137,7 +6155,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Generic structured error response for API endpoints.\n            \nDual-write design: existing fields (Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Error / Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Message etc.)\nare preserved for backward compatibility alongside the canonical\nDebitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.BusinessErrors array, allowing consumers to migrate at their own pace."
+        "description": "Generic structured error response for API endpoints.\n            \nThe BusinessErrors array is the preferred format. The older fields\n(Error, Message etc.) are kept for backward compatibility."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Files.CaseFileDto": {
         "type": "object",
@@ -6705,7 +6723,7 @@
           },
           "typeLabel": {
             "type": "string",
-            "description": "Human-readable label for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Type (e.g. \"Reply to chat\").",
+            "description": "Human-readable label for Type (e.g. \"Reply to chat\").",
             "nullable": true
           },
           "title": {
@@ -6731,7 +6749,7 @@
           },
           "caseReference": {
             "type": "string",
-            "description": "Your reference for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.CaseId, if any.",
+            "description": "Your reference for CaseId, if any.",
             "nullable": true
           },
           "leadId": {
@@ -6759,7 +6777,7 @@
           },
           "solutionUrl": {
             "type": "string",
-            "description": "Absolute URL — identical to the one the Creditor app itself links to — where a human can\nresolve this task. Always present, regardless of whether Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action is populated.",
+            "description": "Absolute URL — identical to the one the Creditor app itself links to — where a human can\nresolve this task. Always present, regardless of whether Action is populated.",
             "nullable": true
           },
           "action": {
@@ -6767,7 +6785,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "A creditor-facing action item (\"task\") — something the platform needs the client to do\nbefore a case can proceed (e.g. reply to a chat, sign a contract, assign a bank account).\n            \nEvery task carries a Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.SolutionUrl — an absolute link identical to the one used\ninside the Creditor app — so a human can resolve any task in one click, even task types that\nare not yet directly API-actionable. Tasks that ARE directly API-actionable additionally carry\na non-null Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action pointing at the exact API call that resolves them."
+        "description": "A creditor-facing action item (\"task\") — something the platform needs the client to do\nbefore a case can proceed (e.g. reply to a chat, sign a contract, assign a bank account).\n            \nEvery task carries a SolutionUrl — an absolute link identical to the one used\ninside the Creditor app — so a human can resolve any task in one click, even task types that\nare not yet directly API-actionable. Tasks that ARE directly API-actionable additionally carry\na non-null Action pointing at the exact API call that resolves them."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskListDto": {
         "required": [
@@ -6809,7 +6827,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "A user belonging to the authenticated collection partner's team.\nUse the Debitura.Web.ExternalApi.Contracts.V1.Users.CollectionPartnerUserDto.Id as the `assignedUserId` when starting a case via POST /cases/{id}/start."
+        "description": "A user belonging to the authenticated collection partner's team.\nUse the Id as the `assignedUserId` when starting a case via POST /cases/{id}/start."
       },
       "Debitura.Web.ExternalApi.Contracts.V1.Users.UserListDto": {
         "required": [
@@ -6929,12 +6947,12 @@
           },
           "errorMessage": {
             "type": "string",
-            "description": "Error message if IsEligible = false.\nBranch on Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.IneligibilityReasonCode rather than on this text, which may be reworded.",
+            "description": "Error message if IsEligible = false.\nBranch on IneligibilityReasonCode rather than on this text, which may be reworded.",
             "nullable": true
           },
           "ineligibilityReasonCode": {
             "type": "string",
-            "description": "Stable machine-readable reason, present whenever Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ErrorMessage is.\nOne of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum, DebtorTypeNotCovered,\nNotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.\n\nOnly NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum\nmeans the geography IS covered and only the claim amount fell short. EligibilityUndetermined\nis a transient failure on our side, not a statement about coverage.",
+            "description": "Stable machine-readable reason, present whenever ErrorMessage is.\nOne of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum, DebtorTypeNotCovered,\nNotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.\n\nOnly NoGeographicCoverage means we have no partner in the jurisdiction. AmountBelowMinimum\nmeans the geography IS covered and only the claim amount fell short. EligibilityUndetermined\nis a transient failure on our side, not a statement about coverage.",
             "nullable": true
           },
           "applicableMinimumAmount": {
@@ -6945,7 +6963,7 @@
           },
           "applicableMinimumCurrencyCode": {
             "type": "string",
-            "description": "ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ApplicableMinimumAmount is expressed in.",
+            "description": "ISO code that ApplicableMinimumAmount is expressed in.",
             "nullable": true
           },
           "marketMinimumAmount": {
@@ -6956,7 +6974,7 @@
           },
           "marketMinimumCurrencyCode": {
             "type": "string",
-            "description": "ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.MarketMinimumAmount is expressed in.",
+            "description": "ISO code that MarketMinimumAmount is expressed in.",
             "nullable": true
           },
           "amountCheckUnavailable": {
@@ -7277,8 +7295,7 @@
             "nullable": true
           },
           "testPayload": {
-            "description": "The test event payload that was sent.",
-            "nullable": true
+            "description": "The test event payload that was sent."
           }
         },
         "additionalProperties": false,

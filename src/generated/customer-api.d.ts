@@ -32,9 +32,13 @@ export interface paths {
          *     - sort - Sort field and direction (format: 'field:direction')
          *       Valid sort fields: DateCreated, DateUpdated, DateFinished, DateCollectionStarted,
          *       DueDate, Date, GrossAmount, Remainder, InterestFees, CollectionFees, ReminderFees,
-         *       Lifecycle, CloseCode
+         *       Lifecycle, CloseCode, ClaimType, Reference, CreditorReference, CollectionPartnerReference,
+         *       Type, Classification, Debtor, Creditor, Country, ExclusivityEndDate, ActiveCollectionPeriodEndDate,
+         *       PaymentTotalSum, CurrentPhase, CollectionPartner, Jurisdiction,
+         *       ManagedByPartner, CreditorDivision, AssignedCollectorUser, AssignedCreditorUser,
+         *       AssignedManagingPartnerUser, ReferralPartner
          *       Examples: 'DateCreated:desc', 'DueDate:asc', 'GrossAmount:desc'
-         *       Unknown fields are silently ignored.
+         *       Unknown fields return HTTP 400. Equal values are ordered by case ID in the last requested direction.
          *
          *     **Response:**
          *     - Returns InvoiceListApiDTO with page metadata and cases array
@@ -145,9 +149,6 @@ export interface paths {
          *
          *     **Optional Parameters:**
          *     - creditorDivisionId - Assign case to a specific division (for multi-division creditors)
-         *     - collectionPartnerId - Override automatic partner assignment with a specific collection partner
-         *     - skipDebituraVerification - Skip internal verification steps (advanced use)
-         *     - skipCreationEmails - Deprecated: accepted for backwards compatibility but ignored server-side. Creation emails are always suppressed in favour of the hourly CasesStarted digest
          *     - allowPendingContracts - Accept cases with unsigned contracts in 'PendingContractSigning' status instead of returning 422
          *
          *     **Error Responses:**
@@ -292,7 +293,10 @@ export interface paths {
          *
          *     **Important Notes:**
          *     - This endpoint does NOT create a case - it only previews what would happen
-         *     - The preview uses the same eligibility logic as POST /cases
+         *     - A matched preview applies the same monetary admission rules as POST /cases; create revalidates all rules
+         *     - Monetary refusals return AmountBelowMinimum and admissionMinimum (rule, USD amount, request-currency amount and currency code)
+         *     - amountCheckUnavailable means monetary eligibility is provisional because a required conversion was unavailable
+         *     - Unmatched cases remain ineligible at every amount; this API does not offer network/custom-quote submission
          *     - If multiple partners match (system limitation), the first match is returned
          *     - All required actions must be completed before calling POST /cases
          *
@@ -3070,6 +3074,8 @@ export interface paths {
          *     - `since` (optional): only returns events created at or after this ISO 8601 timestamp.
          *
          *     **Note:** Only events for your subscriptions are returned — events from other creditors' subscriptions are never exposed.
+         *
+         *     **Retention:** event payloads are kept for 28 days. After that the event is still listed, with an empty `payload`, and can no longer be replayed.
          */
         get: {
             parameters: {
@@ -3135,6 +3141,8 @@ export interface paths {
          *     - Part of CI-loop ASSERT: confirm an event was dispatched, then replay to a different receiver.
          *
          *     **Tenant isolation:** Only events belonging to your own subscriptions can be replayed.
+         *
+         *     **Retention:** events older than 28 days have had their payload cleared and return `410 Gone`.
          */
         post: {
             parameters: {
@@ -3160,6 +3168,13 @@ export interface paths {
                 };
                 /** @description Event not found or not owned by this creditor */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Event is older than 28 days; its payload is no longer available */
+                410: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3249,17 +3264,17 @@ export interface paths {
          *     **Example Payload:**
          *     ```json
          *     {
-         *       "id": "evt_abc123",
+         *       "id": "bfa8af05-4bd1-4fd5-8f80-a6357f99dc59",
+         *       "specVersion": "1.0",
          *       "event": "case.created",
          *       "timestamp": "2024-01-15T10:30:00Z",
          *       "data": {
-         *         "caseId": "guid-here",
+         *         "caseId": "72d427c1-c38c-48db-b369-6f4a2e9cad3f",
          *         "reference": "Q8OAXF3W",
-         *         "creditorReference": "INV-001",
-         *         "status": "Active",
-         *         "amount": 1000.00,
-         *         "currency": "EUR",
-         *         "debtorName": "Debtor Company Ltd"
+         *         "lifecycle": "Pending Verification Internal"
+         *       },
+         *       "links": {
+         *         "self": "https://customer-api.debitura.com/Cases/72d427c1-c38c-48db-b369-6f4a2e9cad3f"
          *       }
          *     }
          *     ```
@@ -3810,6 +3825,23 @@ export interface components {
             creditorRespondedAt?: string | null;
             items?: components["schemas"]["Debitura.Domain.Services.CaseValidation.CaseValidationItemDto"][] | null;
         };
+        /** @description Safe, additive metadata for a monetary admission refusal. Recheck preview after changing the claim. */
+        "Debitura.Web.ExternalApi.Contracts.V1.Cases.AdmissionMinimumDto": {
+            /** @description PlatformMinimum (configured client/partner/platform floor) or UnitedStatesMinimum. */
+            rule?: string | null;
+            /**
+             * Format: double
+             * @description The minimum principal in USD.
+             */
+            amountUsd?: number;
+            /**
+             * Format: double
+             * @description The minimum principal in the request currency, rounded upward to two decimals.
+             */
+            amount?: number;
+            /** @description ISO currency code of Amount. */
+            currencyCode?: string | null;
+        };
         /** @description Response from POST /test/cases/{id}/advance. */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.AdvanceTestCaseResponse": {
             /** @description True if the case was advanced in this call; false if it was already at or past the target state (no-op). */
@@ -3883,7 +3915,7 @@ export interface components {
              *     Partners who want a <b>single URL</b> that walks the user through every pending
              *     signing in one chain — instead of forwarding one URL per
              *     `BusinessErrorApiDTO` — should use
-             *     Debitura.Web.ExternalApi.Contracts.V1.Cases.BusinessErrorResponseApiDTO.SigningHandoff's `CombinedSigningUrl`.
+             *     SigningHandoff's `CombinedSigningUrl`.
              *     The two are complementary: `SolutionUrl` is granular per-error;
              *     `CombinedSigningUrl` is the chain-walking alternative for signing-related errors.
              */
@@ -4131,10 +4163,14 @@ export interface components {
             enqueuedCount?: number;
         };
         /**
-         * @description Additive external-API read model. Per-bucket outstanding on the debt ledger, produced by
-         *     the payment allocation engine (bucket total minus Σ active stored allocations — never re-derived
-         *     from a model). Mirrors the internal
-         *     `Debitura.Domain.Model.Receiveables.InvoiceEconomics.EconomicalAllocationOutstanding` shape.
+         * @description What is still open on the case in each part of the claim: principal, interest, reminder fees and
+         *     collection fees. Each part is its total on the case minus the payments allocated to it, never below 0.
+         *     Every payment is split across the parts in proportion to what is open in each just before it; a
+         *     payment that clears the whole balance clears every part, and any excess counts as principal. Before
+         *     any payment, principal equals grossAmount. Filled only on the Customer API's single-case reads
+         *     (GET /cases/{id}, by creditor reference, by case reference); always null elsewhere. Also null when
+         *     a payment on the case was recorded before this split was stored; such a case is normally filled
+         *     from its next payment on.
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceAllocationOutstandingDto": {
             /** Format: double */
@@ -4184,7 +4220,7 @@ export interface components {
             closeCode?: string | null;
             /**
              * @description The current phase of the case's engagement: "Pre-legal", "Legal", or "Enforcement".
-             *     A different axis from Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.Lifecycle/Debitura.Web.ExternalApi.Contracts.V1.Cases.InvoiceDto.CloseCode — an Active case can be
+             *     A different axis from Lifecycle/CloseCode — an Active case can be
              *     in any of the three phases.
              *
              *     Null means "no active engagement" (e.g. lead / quoting / pre-contract-signing / unassigned, or
@@ -4245,8 +4281,7 @@ export interface components {
             exclusivePeriodEndDate?: string | null;
             /**
              * @description Whether the claim is disputed by the debtor.
-             *     Returns the description of Debitura.Domain.Model.Receiveables.Invoices.Enums.ClaimDisputeStatus:
-             *     "Yes, the claim is disputed", "No, the claim is not disputed", or "Don't Know".
+             *     One of: "Yes, the claim is disputed", "No, the claim is not disputed", or "Don't Know".
              *     Null when the dispute status has not been set on the case.
              */
             disputeStatus?: string | null;
@@ -4294,17 +4329,17 @@ export interface components {
         /** @description Detailed preview result for a case submission. */
         "Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto": {
             /**
-             * @description Whether the case is eligible for collection (i.e., a collection partner is available).
+             * @description Whether a collection partner is available and submit's monetary admission checks pass.
              *     If false, check IneligibilityReason for details.
              */
             isEligible?: boolean;
             /**
              * @description Explanation of why the case is not eligible (only present when IsEligible = false).
-             *     Branch on Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReasonCode rather than on this text, which may be reworded.
+             *     Branch on IneligibilityReasonCode rather than on this text, which may be reworded.
              */
             ineligibilityReason?: string | null;
             /**
-             * @description Stable machine-readable reason, present whenever Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.IneligibilityReason is
+             * @description Stable machine-readable reason, present whenever IneligibilityReason is
              *     One of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum,
              *     DebtorTypeNotCovered, NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.
              *
@@ -4314,6 +4349,7 @@ export interface components {
              *     telling the client their address is wrong.
              */
             ineligibilityReasonCode?: string | null;
+            admissionMinimum?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.AdmissionMinimumDto"];
             /**
              * Format: double
              * @description What this claim would have to reach to be accepted, in the currency of the request; never below
@@ -4322,7 +4358,7 @@ export interface components {
              *     request currency cannot be priced. Null when no partner covering this case declares a minimum.
              */
             applicableMinimumAmount?: number | null;
-            /** @description ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.ApplicableMinimumAmount is expressed in. */
+            /** @description ISO code that ApplicableMinimumAmount is expressed in. */
             applicableMinimumCurrencyCode?: string | null;
             /**
              * Format: double
@@ -4333,11 +4369,11 @@ export interface components {
              *     case is created. Null when no partner covers the market or the amount cannot be priced.
              */
             marketMinimumAmount?: number | null;
-            /** @description ISO code that Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.MarketMinimumAmount is expressed in. */
+            /** @description ISO code that MarketMinimumAmount is expressed in. */
             marketMinimumCurrencyCode?: string | null;
             /**
              * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
-             *     amount-based part of this answer was NOT actually checked It can be true on an
+             *     amount-based part of matching or monetary admission was NOT actually checked. It can be true on an
              *     eligible answer: a partner matched only because amount conditions failed open while rates were
              *     down. Treat such an answer as provisional and retry rather than relying on the floor having
              *     been applied.
@@ -4577,15 +4613,6 @@ export interface components {
              *     collecting partner.
              */
             claimLines?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Cases.Requests.ClaimLineDto"][] | null;
-            /** @description This skips the 'Pending verification' for Debitura and puts case straight to partner */
-            skipDebituraVerification?: boolean;
-            /**
-             * @deprecated
-             * @description Deprecated — this field is accepted for backwards compatibility but is ignored server-side.
-             *     Creation emails are always suppressed; the hourly CasesStarted digest is the single
-             *     notification channel for all entry points.
-             */
-            skipCreationEmails?: boolean;
             /**
              * @description When true, cases with unsigned contracts (SDCA/POA) are accepted in 'PendingContractSigning'
              *     status instead of being rejected with 422. The case transitions automatically once contracts are signed.
@@ -4605,13 +4632,6 @@ export interface components {
              *     Only meaningful when IsTest is true. Max 100 characters.
              */
             tag?: string | null;
-            /**
-             * Format: uuid
-             * @description Optional: Specify a collection partner ID to handle this case.
-             *     When provided, this partner will be used regardless of lead agent matching rules.
-             *     The partner must be active and have coverage for the debtor's jurisdiction.
-             */
-            collectionPartnerId?: string | null;
             /**
              * Format: email
              * @description Optional: Email address of the creditor team member to assign as the case owner.
@@ -4844,7 +4864,7 @@ export interface components {
              *
              *     Partners who want a <b>single URL</b> that walks the user through every pending
              *     action in one chain — instead of forwarding one URL per `RequiredActionDto` —
-             *     should use Debitura.Web.ExternalApi.Contracts.V1.Cases.PreviewResultDto.SigningHandoff's
+             *     should use SigningHandoff's
              *     `CombinedSigningUrl`. The two are complementary: `SolutionUrl` is granular
              *     per-action; `CombinedSigningUrl` is the chain-walking alternative for
              *     signing-related actions.
@@ -5011,9 +5031,8 @@ export interface components {
         /**
          * @description Generic structured error response for API endpoints.
          *
-         *     Dual-write design: existing fields (Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Error / Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.Message etc.)
-         *     are preserved for backward compatibility alongside the canonical
-         *     Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto.BusinessErrors array, allowing consumers to migrate at their own pace.
+         *     The BusinessErrors array is the preferred format. The older fields
+         *     (Error, Message etc.) are kept for backward compatibility.
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Errors.ApiErrorResponseDto": {
             /** @description Short human-readable error label (legacy field — preserved for backward compatibility). */
@@ -5233,10 +5252,10 @@ export interface components {
          * @description A creditor-facing action item ("task") — something the platform needs the client to do
          *     before a case can proceed (e.g. reply to a chat, sign a contract, assign a bank account).
          *
-         *     Every task carries a Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.SolutionUrl — an absolute link identical to the one used
+         *     Every task carries a SolutionUrl — an absolute link identical to the one used
          *     inside the Creditor app — so a human can resolve any task in one click, even task types that
          *     are not yet directly API-actionable. Tasks that ARE directly API-actionable additionally carry
-         *     a non-null Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action pointing at the exact API call that resolves them.
+         *     a non-null Action pointing at the exact API call that resolves them.
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto": {
             /**
@@ -5249,7 +5268,7 @@ export interface components {
              *     additive-safe contract — it does NOT track the internal integer enum used in storage.
              */
             type?: string | null;
-            /** @description Human-readable label for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Type (e.g. "Reply to chat"). */
+            /** @description Human-readable label for Type (e.g. "Reply to chat"). */
             typeLabel?: string | null;
             /** @description Short task title, as shown in the Creditor app. */
             title?: string | null;
@@ -5263,7 +5282,7 @@ export interface components {
              *     Null for account-level tasks not tied to a single case (e.g. SignContract, AssignBankAccount).
              */
             caseId?: string | null;
-            /** @description Your reference for Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.CaseId, if any. */
+            /** @description Your reference for CaseId, if any. */
             caseReference?: string | null;
             /**
              * Format: uuid
@@ -5292,7 +5311,7 @@ export interface components {
             dateSolved?: string | null;
             /**
              * @description Absolute URL — identical to the one the Creditor app itself links to — where a human can
-             *     resolve this task. Always present, regardless of whether Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskDto.Action is populated.
+             *     resolve this task. Always present, regardless of whether Action is populated.
              */
             solutionUrl?: string | null;
             action?: components["schemas"]["Debitura.Web.ExternalApi.Contracts.V1.Tasks.TaskActionDto"];
@@ -5304,7 +5323,7 @@ export interface components {
         };
         /**
          * @description A user belonging to the authenticated collection partner's team.
-         *     Use the Debitura.Web.ExternalApi.Contracts.V1.Users.CollectionPartnerUserDto.Id as the `assignedUserId` when starting a case via POST /cases/{id}/start.
+         *     Use the Id as the `assignedUserId` when starting a case via POST /cases/{id}/start.
          */
         "Debitura.Web.ExternalApi.Contracts.V1.Users.CollectionPartnerUserDto": {
             /**
@@ -5365,11 +5384,11 @@ export interface components {
             powerOfAttorneyStatus?: components["schemas"]["Debitura.Web.ExternalCustomerAPI.Models.Coverages.PowerOfAttorneyStatusApiDTO"];
             /**
              * @description Error message if IsEligible = false.
-             *     Branch on Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.IneligibilityReasonCode rather than on this text, which may be reworded.
+             *     Branch on IneligibilityReasonCode rather than on this text, which may be reworded.
              */
             errorMessage?: string | null;
             /**
-             * @description Stable machine-readable reason, present whenever Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ErrorMessage is.
+             * @description Stable machine-readable reason, present whenever ErrorMessage is.
              *     One of: NoGeographicCoverage, AmountBelowMinimum, AmountAboveMaximum, DebtorTypeNotCovered,
              *     NotCoveredByPartnerRules, ExcludedForClient, EligibilityUndetermined.
              *
@@ -5386,7 +5405,7 @@ export interface components {
              *     request currency cannot be priced. Null when no partner covering this case declares a minimum.
              */
             applicableMinimumAmount?: number | null;
-            /** @description ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.ApplicableMinimumAmount is expressed in. */
+            /** @description ISO code that ApplicableMinimumAmount is expressed in. */
             applicableMinimumCurrencyCode?: string | null;
             /**
              * Format: double
@@ -5397,7 +5416,7 @@ export interface components {
              *     case is created. Null when no partner covers the market or the amount cannot be priced.
              */
             marketMinimumAmount?: number | null;
-            /** @description ISO code that Debitura.Web.ExternalCustomerAPI.Models.Coverages.CaseEligibilityResponseApiDTO.MarketMinimumAmount is expressed in. */
+            /** @description ISO code that MarketMinimumAmount is expressed in. */
             marketMinimumCurrencyCode?: string | null;
             /**
              * @description True when a currency conversion needed to evaluate the claim amount was unavailable, so the
