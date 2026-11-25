@@ -16,6 +16,7 @@
  * INVARIANT — only add a method here if it invokes NO tool/resource/prompt
  * handler and makes NO upstream call. The API key only reaches the Customer API
  * via such a handler; adding a fetching method here would leak the sentinel key.
+ * The open tools below are the one exception, and they never use the key.
  */
 export const KEYLESS_METHODS = new Set([
   "initialize",
@@ -28,16 +29,40 @@ export const KEYLESS_METHODS = new Set([
 ]);
 
 /**
- * A keyless request is allowed only if EVERY JSON-RPC message in the body is a
- * discovery/handshake method. Batched arrays are required to be fully exempt —
- * if any element is a non-exempt method, the whole request needs a key.
+ * Tools that answer without an API key (DEB-9129): coverage, the collection
+ * process and the sign-up link. Their handlers call only the keyless coverage
+ * estimate, through a client that never carries the caller's key
+ * (src/tools/open.ts).
  */
-export function isKeylessDiscoveryRequest(body: unknown): boolean {
-  const isExempt = (msg: unknown): boolean =>
-    typeof msg === "object" &&
-    msg !== null &&
-    typeof (msg as { method?: unknown }).method === "string" &&
-    KEYLESS_METHODS.has((msg as { method: string }).method);
+export const OPEN_TOOL_NAMES = new Set(["check_coverage", "explain_process", "start_case_link"]);
+
+/** The tool name of a `tools/call` message, or undefined for anything else. */
+export function toolCallName(msg: unknown): string | undefined {
+  if (typeof msg !== "object" || msg === null) return undefined;
+  const { method, params } = msg as { method?: unknown; params?: { name?: unknown } };
+  if (method !== "tools/call") return undefined;
+  const name = typeof params === "object" && params !== null ? params.name : undefined;
+  return typeof name === "string" ? name : undefined;
+}
+
+/**
+ * Rule: a keyless request is allowed only if EVERY JSON-RPC message in the body
+ *       is a discovery/handshake method or a tools/call of an open tool (exact
+ *       name). A batch with any other element needs a key as a whole.
+ * Why: the open tools are what ChatGPT and Claude users may call before they sign
+ *      up; the 16 creditor tools stay behind the key (DEB-4904, DEB-9129).
+ * Breaks if: the name match is loosened (prefix, case-insensitive) or a batch is
+ *      judged by its first element only.
+ */
+export function isKeylessRequest(body: unknown): boolean {
+  const isExempt = (msg: unknown): boolean => {
+    if (typeof msg !== "object" || msg === null) return false;
+    const method = (msg as { method?: unknown }).method;
+    if (typeof method !== "string") return false;
+    if (KEYLESS_METHODS.has(method)) return true;
+    const tool = toolCallName(msg);
+    return tool !== undefined && OPEN_TOOL_NAMES.has(tool);
+  };
   if (Array.isArray(body)) return body.length > 0 && body.every(isExempt);
   return isExempt(body);
 }

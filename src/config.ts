@@ -16,3 +16,20 @@ export const PORT = Number(process.env.PORT ?? 3000);
 export const SERVER_NAME = "debitura";
 /** Derived from package.json — the single source of truth for the version. */
 export const SERVER_VERSION: string = pkg.version;
+
+/**
+ * Base URL of the creditor app the `start_case_link` tool links to (DEB-9129).
+ * Test: https://testapp.debitura.com
+ */
+export const APP_BASE_URL = process.env.DEBITURA_APP_BASE_URL ?? "https://app.debitura.com";
+
+/** Open-tool calls allowed per client IP per minute (DEB-9129). */
+export const OPEN_TOOLS_RATE_LIMIT_PER_MINUTE = positiveInt(
+  process.env.OPEN_TOOLS_RATE_LIMIT_PER_MINUTE,
+  60,
+);
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
