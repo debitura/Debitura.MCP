@@ -3,8 +3,16 @@ import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildServer } from "./server.js";
 import { buildServerCard, type ServerCard } from "./server-card.js";
-import { isKeylessDiscoveryRequest, DISCOVERY_SENTINEL_KEY } from "./auth-gate.js";
-import { PORT, SERVER_VERSION } from "./config.js";
+import {
+  isKeylessRequest,
+  toolCallName,
+  OPEN_TOOL_NAMES,
+  DISCOVERY_SENTINEL_KEY,
+} from "./auth-gate.js";
+import { OPEN_TOOLS_RATE_LIMIT_PER_MINUTE, PORT, SERVER_VERSION } from "./config.js";
+import { FixedWindowLimiter, clientIp } from "./rate-limit.js";
+import { clientName, trackToolCall } from "./telemetry.js";
+import { resolveCountry } from "./countries.js";
 
 /**
  * Extract the creditor API key from the incoming request.
@@ -47,12 +55,47 @@ app.get("/.well-known/mcp/server-card.json", async (_req, res) => {
   }
 });
 
+const openToolLimiter = new FixedWindowLimiter(OPEN_TOOLS_RATE_LIMIT_PER_MINUTE);
+
 app.post("/mcp", async (req: Request, res: Response) => {
   const apiKey = extractApiKey(req);
+  const client = clientName(req.headers["user-agent"]);
+  const messages: unknown[] = Array.isArray(req.body) ? req.body : [req.body];
+  const toolCalls = messages.flatMap((msg) => {
+    const tool = toolCallName(msg);
+    return tool === undefined ? [] : [{ tool, msg }];
+  });
+  const openCalls = toolCalls.filter((c) => OPEN_TOOL_NAMES.has(c.tool)).length;
+  const retryAfter = openCalls > 0 ? openToolLimiter.take(clientIp(req), openCalls) : 0;
+  for (const { tool, msg } of toolCalls) {
+    const open = OPEN_TOOL_NAMES.has(tool);
+    const args = (msg as { params?: { arguments?: { country?: unknown } } }).params?.arguments;
+    trackToolCall({
+      tool: tool.slice(0, 64),
+      client,
+      authenticated: apiKey !== undefined,
+      rateLimited: retryAfter > 0 && open,
+      country: open
+        ? (resolveCountry(typeof args?.country === "string" ? args.country : undefined)?.alpha2 ??
+          "unresolved")
+        : undefined,
+    });
+  }
+
+  if (retryAfter > 0) {
+    res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({
+      jsonrpc: "2.0",
+      error: { code: -32029, message: "Too many requests: try again in a minute." },
+      id: null,
+    });
+    return;
+  }
+
   // Allow the unauthenticated discovery/handshake (initialize, tools/list, …) so
-  // external directories can health-check the endpoint anonymously. Everything
-  // else — notably tools/call — still requires a key.
-  if (!apiKey && !isKeylessDiscoveryRequest(req.body)) {
+  // external directories can health-check the endpoint anonymously, and the open
+  // tools (DEB-9129). Every other tools/call still requires a key.
+  if (!apiKey && !isKeylessRequest(req.body)) {
     res.status(401).json({
       jsonrpc: "2.0",
       error: {
@@ -66,9 +109,9 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 
   // Stateless mode: fresh server + transport per request, bound to this key.
-  // Keyless discovery requests get a sentinel key that never reaches the
-  // Customer API (no tool handler runs for discovery methods).
-  const server = buildServer(apiKey ?? DISCOVERY_SENTINEL_KEY);
+  // Keyless requests get a sentinel key that never reaches the Customer API: no
+  // keyed tool handler runs for them, and the open tools never use the key.
+  const server = buildServer(apiKey ?? DISCOVERY_SENTINEL_KEY, { client });
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     // Plain JSON responses instead of SSE: this server is stateless and sits
