@@ -98,7 +98,10 @@ export async function fetchEstimate(query: Record<string, string | undefined>): 
       return { kind: "invalid", message };
     }
     if (!res.ok) return { kind: "failed" };
-    return { kind: "ok", body: (await res.json()) as EstimateBody };
+    const body: unknown = await res.json();
+    // A 200 that is not the estimate envelope is treated as a failed dependency.
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return { kind: "failed" };
+    return { kind: "ok", body: body as EstimateBody };
   } catch {
     return { kind: "failed" };
   }

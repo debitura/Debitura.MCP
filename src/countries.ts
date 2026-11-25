@@ -98,7 +98,7 @@ export function resolveCountry(input: string | undefined | null): ResolvedCountr
   if (typeof input !== "string" || input.length > 100) return undefined;
   const key = normalize(input);
   if (!key) return undefined;
-  const code = key.length === 2 ? key.toUpperCase() : BY_NAME.get(key);
+  const code = ALIASES[key] ?? (key.length === 2 ? key.toUpperCase() : BY_NAME.get(key));
   if (!code) return undefined;
   const name = BY_CODE.get(code);
   return name ? { alpha2: code, name } : undefined;
