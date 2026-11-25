@@ -56,6 +56,7 @@ app.get("/.well-known/mcp/server-card.json", async (_req, res) => {
 });
 
 const openToolLimiter = new FixedWindowLimiter(OPEN_TOOLS_RATE_LIMIT_PER_MINUTE);
+const MAX_EVENTS_PER_REQUEST = 20;
 
 app.post("/mcp", async (req: Request, res: Response) => {
   const apiKey = extractApiKey(req);
@@ -65,9 +66,30 @@ app.post("/mcp", async (req: Request, res: Response) => {
     const tool = toolCallName(msg);
     return tool === undefined ? [] : [{ tool, msg }];
   });
+  // Allow the unauthenticated discovery/handshake (initialize, tools/list, …) so
+  // external directories can health-check the endpoint anonymously, and the open
+  // tools (DEB-9129). Every other tools/call still requires a key. Refused
+  // requests are neither counted against the limit nor sent to telemetry.
+  if (!apiKey && !isKeylessRequest(req.body)) {
+    res.status(401).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32001,
+        message:
+          "Missing API key. Send your Debitura API key in the 'XApiKey' header (or 'Authorization: Bearer <key>'). Get your key at https://app.debitura.com/CreditorApiKey",
+      },
+      id: null,
+    });
+    return;
+  }
+
   const openCalls = toolCalls.filter((c) => OPEN_TOOL_NAMES.has(c.tool)).length;
   const retryAfter = openCalls > 0 ? openToolLimiter.take(clientIp(req), openCalls) : 0;
-  for (const { tool, msg } of toolCalls) {
+  // Rule: at most MAX_EVENTS_PER_REQUEST telemetry events per HTTP request.
+  // Why: a batch can hold thousands of tools/call messages (40 MB body limit);
+  //      one event each would flood App Insights and the single worker's sockets.
+  // Breaks if: events are sent per message without the cap, or before the gate.
+  for (const { tool, msg } of toolCalls.slice(0, MAX_EVENTS_PER_REQUEST)) {
     const open = OPEN_TOOL_NAMES.has(tool);
     const args = (msg as { params?: { arguments?: { country?: unknown } } }).params?.arguments;
     trackToolCall({
@@ -88,22 +110,6 @@ app.post("/mcp", async (req: Request, res: Response) => {
     res.status(429).json({
       jsonrpc: "2.0",
       error: { code: -32029, message: "Too many requests: try again in a minute." },
-      id: null,
-    });
-    return;
-  }
-
-  // Allow the unauthenticated discovery/handshake (initialize, tools/list, …) so
-  // external directories can health-check the endpoint anonymously, and the open
-  // tools (DEB-9129). Every other tools/call still requires a key.
-  if (!apiKey && !isKeylessRequest(req.body)) {
-    res.status(401).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32001,
-        message:
-          "Missing API key. Send your Debitura API key in the 'XApiKey' header (or 'Authorization: Bearer <key>'). Get your key at https://app.debitura.com/CreditorApiKey",
-      },
       id: null,
     });
     return;
