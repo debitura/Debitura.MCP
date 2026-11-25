@@ -84,13 +84,13 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 
   const openCalls = toolCalls.filter((c) => OPEN_TOOL_NAMES.has(c.tool)).length;
-  // Rule: only requests whose tool calls are all open tools are counted and
-  //       limited; a batch that also calls a keyed tool is never limited.
-  // Why: keyed calls are never limited (contract); a mixed batch needs a key, so
-  //      its caller is an identified creditor.
-  // Breaks if: a batch with a keyed tool can be answered 429.
-  const limited = openCalls > 0 && openCalls === toolCalls.length;
-  const retryAfter = limited ? openToolLimiter.take(clientIp(req), openCalls) : 0;
+  // Rule: every open-tool call in a request counts, and a request over the
+  //       limit is refused whole (429), even if it also calls a keyed tool.
+  // Why: the server never validates a key, so exempting batches that carry a
+  //      keyed tool would let anyone send a dummy key plus thousands of open
+  //      calls; no real client mixes the two in one batch.
+  // Breaks if: open calls are left uncounted for any request shape.
+  const retryAfter = openCalls > 0 ? openToolLimiter.take(clientIp(req), openCalls) : 0;
   // Rule: at most MAX_EVENTS_PER_REQUEST telemetry events per HTTP request.
   // Why: a batch can hold thousands of tools/call messages (40 MB body limit);
   //      one event each would flood App Insights and the single worker's sockets.
