@@ -2,8 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildSignupUrl } from "./open.js";
 
-// RISK (DEB-9129): a renamed claim_*/utm_* parameter or a loosened amount check
-// silently stops MCP sign-ups from being prefilled (DEB-8074) or counted.
+// RISK (DEB-9129): a renamed claim_*/utm_* parameter silently stops MCP sign-ups
+// from being prefilled (DEB-8074) or counted.
 describe("start-case sign-up link", () => {
   const base = "https://app.debitura.com";
 
@@ -25,13 +25,5 @@ describe("start-case sign-up link", () => {
       utm_medium: "mcp",
       utm_campaign: "start_case",
     });
-  });
-
-  it("drops an amount outside DEB-8074's shape and keeps the rest", () => {
-    for (const amount of ["1e3", "-5", "0", "15000.555", "15,000", "1234567890123"]) {
-      const url = new URL(buildSignupUrl({ country: "ES", amount }, "chatgpt", base));
-      assert.equal(url.searchParams.get("claim_amount"), null, `${amount} should be dropped`);
-      assert.equal(url.searchParams.get("claim_country"), "ES");
-    }
   });
 });

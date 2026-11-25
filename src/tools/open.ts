@@ -80,8 +80,15 @@ type Estimate =
   { kind: "ok"; body: EstimateBody } | { kind: "invalid"; message: string } | { kind: "failed" };
 
 /**
- * The Customer API's keyless coverage estimate (DEB-9128). Deliberately a plain
- * fetch with no key header: the caller's API key must never reach this call.
+ * The Customer API's keyless coverage estimate (DEB-9128).
+ *
+ * Rule: this call never carries the caller's API key; it is a plain fetch, not
+ *       the keyed openapi client.
+ * Why: the open tools run for anyone, including callers who did send a key; the
+ *      estimate needs none, and a key must only travel to calls made on that
+ *      creditor's behalf.
+ * Breaks if: it is switched to `createApiClient(apiKey)` or given the request's
+ *      headers: a creditor's key would be sent on an anonymous lookup.
  */
 export async function fetchEstimate(query: Record<string, string | undefined>): Promise<Estimate> {
   const url = new URL("/coverage/estimate", API_BASE_URL);
@@ -109,7 +116,15 @@ export async function fetchEstimate(query: Record<string, string | undefined>): 
 
 /**
  * Country-only estimate: is this a country Debitura takes cases in at all?
- * Restricted countries answer "Unavailable" (DEB-9128); fail closed otherwise.
+ *
+ * Rule: explain_process and start_case_link give no process text and no sign-up
+ *       link for a country the estimate answers "Unavailable", and give nothing
+ *       but an error when the estimate cannot be read.
+ * Why: Iran, North Korea, Cuba, Russia and Belarus are never presented as covered
+ *      (DEB-6574, DEB-9128). The list lives in the Customer API only, so failing
+ *      open would describe collection in a restricted country.
+ * Breaks if: a failed or malformed estimate is treated as "open", or the country
+ *      list is copied here and drifts from the API's.
  */
 async function checkCountry(
   country: ResolvedCountry,
@@ -220,6 +235,13 @@ export function registerOpenTools(server: McpServer, context: { client: string }
       if (estimate.kind === "failed") return errorResult(UPSTREAM_FAILED);
       if (estimate.kind === "invalid") return errorResult(estimate.message);
       const e = estimate.body.claimEligibility ?? {};
+      // Rule: a country answered "Unavailable" gets only "not covered": no fee
+      //       line, calculator or minimum. A Private debtor also gets the
+      //       consumer-portfolio line.
+      // Why: the messaging framework's claims register (§6): restricted countries
+      //      are never offered, and single consumer claims are never invited.
+      // Breaks if: the fee/calculator fields are added before this return, or the
+      //      consumer line is dropped for Private.
       if (e.status === "Unavailable") return notTakenOn(resolved);
       const minimum =
         amount !== undefined && e.admissionMinimumAmount != null

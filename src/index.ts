@@ -84,7 +84,13 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 
   const openCalls = toolCalls.filter((c) => OPEN_TOOL_NAMES.has(c.tool)).length;
-  const retryAfter = openCalls > 0 ? openToolLimiter.take(clientIp(req), openCalls) : 0;
+  // Rule: only requests whose tool calls are all open tools are counted and
+  //       limited; a batch that also calls a keyed tool is never limited.
+  // Why: keyed calls are never limited (contract); a mixed batch needs a key, so
+  //      its caller is an identified creditor.
+  // Breaks if: a batch with a keyed tool can be answered 429.
+  const limited = openCalls > 0 && openCalls === toolCalls.length;
+  const retryAfter = limited ? openToolLimiter.take(clientIp(req), openCalls) : 0;
   // Rule: at most MAX_EVENTS_PER_REQUEST telemetry events per HTTP request.
   // Why: a batch can hold thousands of tools/call messages (40 MB body limit);
   //      one event each would flood App Insights and the single worker's sockets.
@@ -93,7 +99,10 @@ app.post("/mcp", async (req: Request, res: Response) => {
     const open = OPEN_TOOL_NAMES.has(tool);
     const args = (msg as { params?: { arguments?: { country?: unknown } } }).params?.arguments;
     trackToolCall({
-      // A caller picks the name; only tool-shaped names reach the event.
+      // Rule: only tool-shaped names (^[a-z0-9_]{1,64}$) reach the event; anything else is "invalid".
+      // Why: the caller chooses the name, and events must carry no free text a
+      //      person could put personal data in.
+      // Breaks if: the raw name is recorded.
       tool: /^[a-z0-9_]{1,64}$/.test(tool) ? tool : "invalid",
       client,
       authenticated: apiKey !== undefined,
