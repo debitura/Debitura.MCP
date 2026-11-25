@@ -71,7 +71,8 @@ app.post("/mcp", async (req: Request, res: Response) => {
     const open = OPEN_TOOL_NAMES.has(tool);
     const args = (msg as { params?: { arguments?: { country?: unknown } } }).params?.arguments;
     trackToolCall({
-      tool: tool.slice(0, 64),
+      // A caller picks the name; only tool-shaped names reach the event.
+      tool: /^[a-z0-9_]{1,64}$/.test(tool) ? tool : "invalid",
       client,
       authenticated: apiKey !== undefined,
       rateLimited: retryAfter > 0 && open,
